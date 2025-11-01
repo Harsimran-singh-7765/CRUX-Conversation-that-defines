@@ -15,13 +15,7 @@ MALE_VOICES = [
 ]
 
 FEMALE_VOICES = [
-    "aura-2-thalia-en", "aura-2-amalthea-en", "aura-2-andromeda-en", "aura-2-asteria-en",
-    "aura-2-athena-en", "aura-2-aurora-en", "aura-2-callista-en", "aura-2-cora-en",
-    "aura-2-cordelia-en", "aura-2-delia-en", "aura-2-electra-en", "aura-2-harmonia-en",
-    "aura-2-helena-en", "aura-2-hera-en", "aura-2-iris-en", "aura-2-janus-en",
-    "aura-2-juno-en", "aura-2-luna-en", "aura-2-minerva-en", "aura-2-ophelia-en",
-    "aura-2-pandora-en", "aura-2-phoebe-en", "aura-2-selene-en", "aura-2-theia-en",
-    "aura-2-vesta-en"
+"aura-2-phoebe-en"
 ]
 
 class LiveTranscription:
@@ -57,6 +51,9 @@ class LiveTranscription:
     # --- FIX: This function is SYNCHRONOUS ---
     def send(self, audio_chunk: bytes):
         if self._is_active:
+            # --- ADDED LOG ---
+            logger.debug(f"[LiveTranscription] Sending {len(audio_chunk)} bytes to Deepgram STT.")
+            # ---
             self.dg_connection.send(audio_chunk) # type: ignore
     # --- END FIX ---
 
@@ -65,6 +62,9 @@ class LiveTranscription:
         if result and result.channel and result.channel.alternatives:
             transcript = result.channel.alternatives[0].transcript
             if transcript:
+                # --- ADDED LOG ---
+                logger.debug(f"[LiveTranscription] Partial transcript received: '{transcript}'")
+                # ---
                 self.full_transcript += transcript + " "
 
     def _on_error(self, *args, **kwargs):
@@ -77,6 +77,10 @@ class LiveTranscription:
             self._is_active = False
             self.dg_connection.finish() # .finish() is synchronous
             logger.info("[LiveTranscription] Connection closed.")
+        
+        # --- ADDED LOG ---
+        logger.info(f"[LiveTranscription] Final transcript being returned: '{self.full_transcript.strip()}'")
+        # ---
         return self.full_transcript.strip()
 
 class DeepgramService:
@@ -110,6 +114,10 @@ class DeepgramService:
         }
         
         payload = {"text": text}
+        
+        # --- ADDED LOG ---
+        logger.debug(f"[DeepgramService] TTS Request Details: URL={self.tts_url}, Model={model}, Params={params}")
+        # ---
 
         try:
             async with self.http_client.stream("POST", self.tts_url, headers=headers, params=params, json=payload, timeout=60) as response:
@@ -120,6 +128,9 @@ class DeepgramService:
 
                 logger.info(f"[DeepgramService] Success: 200. Streaming audio...")
                 async for chunk in response.aiter_bytes():
+                    # --- ADDED LOG ---
+                    logger.debug(f"[DeepgramService] Yielding audio chunk: {len(chunk)} bytes")
+                    # ---
                     yield chunk
                 logger.info("[DeepgramService] Audio stream finished.")
 

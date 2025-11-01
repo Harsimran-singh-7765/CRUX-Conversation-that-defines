@@ -15,9 +15,11 @@
             justify-content: center;
             min-height: 100vh;
             margin: 0;
+            padding: 1rem;
+            box-sizing: border-box;
         }
         .container {
-            width: 90%;
+            width: 100%;
             max-width: 600px;
             background: #fff;
             border-radius: 12px;
@@ -27,17 +29,100 @@
         }
         h1 {
             color: #D9534F; /* Pastel Red */
+            margin-top: 0;
         }
         #status {
             font-size: 1.2rem;
             font-weight: bold;
             color: #5BC0DE; /* Pastel Blue */
-            margin: 1.5rem 0;
+            margin: 1rem 0; /* Reduced margin */
             padding: 1rem;
             background: #f0f8ff;
             border-radius: 8px;
             min-height: 2rem;
         }
+        
+        /* --- TIMER STYLE --- */
+        #timer {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #5CB85C; /* Pastel Green */
+            margin-bottom: 1rem;
+        }
+        #timer.low {
+            color: #D9534F; /* Pastel Red */
+            animation: pulse 1s infinite;
+        }
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        /* --- END TIMER STYLE --- */
+
+        #chatLog {
+            width: 100%;
+            height: 200px;
+            overflow-y: scroll;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1.5rem;
+            text-align: left;
+            background: #f9f9f9;
+            box-sizing: border-box; 
+        }
+        .message {
+            margin-bottom: 0.5rem;
+            padding: 0.5rem 0.8rem;
+            border-radius: 10px;
+            max-width: 80%;
+            word-wrap: break-word;
+        }
+        .message.user {
+            background-color: #5BC0DE; /* Pastel Blue */
+            color: white;
+            margin-left: auto;
+            border-bottom-right-radius: 0;
+        }
+        .message.ai {
+            background-color: #e0e0e0;
+            color: #333;
+            margin-right: auto;
+            border-bottom-left-radius: 0;
+        }
+        
+        /* --- TYPING INDICATOR --- */
+        .typing-indicator {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            padding: 0.5rem 0.8rem;
+            background-color: #e0e0e0;
+            border-radius: 10px;
+            max-width: 80px;
+            margin-right: auto;
+            margin-bottom: 0.5rem;
+        }
+        .typing-indicator span {
+            width: 8px;
+            height: 8px;
+            background-color: #999;
+            border-radius: 50%;
+            animation: typing 1.4s infinite;
+        }
+        .typing-indicator span:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+        .typing-indicator span:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+        @keyframes typing {
+            0%, 60%, 100% { transform: translateY(0); }
+            30% { transform: translateY(-10px); }
+        }
+        /* --- END TYPING INDICATOR --- */
+        
         button {
             font-size: 1rem;
             padding: 0.8rem 1.5rem;
@@ -84,7 +169,10 @@
         <button id="btnStartGame">1. Start New Game (Forgotten Birthday)</button>
         <button id="btnConnect" disabled>2. Connect WebSocket</button>
 
+        <div id="timer">Time left: 2:00</div>
+
         <div id="status">Waiting to start...</div>
+        <div id="chatLog"></div>
 
         <button id="btnPushToTalk" disabled>Hold to Speak</button>
         <button id="btnEndGame" disabled>End Game & Get Score</button>
@@ -103,12 +191,18 @@
         const statusDiv = document.getElementById('status');
         const resultsDiv = document.getElementById('results');
         const audioPlayer = document.getElementById('audioPlayer');
+        const chatLog = document.getElementById('chatLog');
+        const timerDiv = document.getElementById('timer');
 
         // --- State ---
         let sessionId = null;
         let socket = null;
         let mediaRecorder = null;
-        let audioQueue = []; // This will collect all the chunks
+        let audioQueue = [];
+        let timerInterval = null;
+        let timeLeft = 120;
+        let typingIndicator = null;
+        let pendingAIMessage = '';
 
         // --- Config ---
         const API_URL = "http://127.0.0.1:8000";
@@ -119,25 +213,23 @@
         // --- 1. Start Game (REST API) ---
         btnStartGame.onclick = async () => {
             updateStatus("Starting game...");
-            console.log("--- 1. STARTING GAME ---");
+            chatLog.innerHTML = "";
+            resultsDiv.innerHTML = "";
+            updateTimerDisplay();
             try {
                 const response = await fetch(`${API_URL}/api/v1/game/start/${TEST_SCENARIO_ID}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ user_id: TEST_USER_ID })
                 });
-
-                console.log("Fetch response received:", response);
-                if (!response.ok) {
-                    throw new Error(`HTTP error! Status: ${response.status}`);
-                }
-
+                if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
                 const data = await response.json();
                 sessionId = data.session_id;
-                console.log("Game started! Session data:", data);
                 updateStatus(`Game created! Session: ${sessionId.substring(0, 8)}...`);
                 btnStartGame.disabled = true;
                 btnConnect.disabled = false;
+                // Don't show initial dialogue immediately - wait for audio to play
+                pendingAIMessage = data.conversation_history[0].message;
             } catch (err) {
                 updateStatus(`Error starting game: ${err.message}`);
                 console.error("Fetch Error:", err);
@@ -150,27 +242,23 @@
                 updateStatus("No session ID. Start a game first.");
                 return;
             }
-
             updateStatus("Connecting to WebSocket...");
             const url = `${WS_URL}/api/v1/game/ws/${sessionId}`;
-            console.log("--- 2. CONNECTING TO WEBSOCKET ---");
             console.log("Connecting to:", url);
             socket = new WebSocket(url);
-            socket.binaryType = 'blob'; // <-- Good practice
+            socket.binaryType = 'blob';
 
             socket.onopen = () => {
-                console.log("WebSocket onopen event fired.");
                 updateStatus("Connected! AI will speak first.");
                 btnConnect.disabled = true;
                 btnEndGame.disabled = false;
+                startTimer();
             };
 
             socket.onmessage = (event) => {
                 if (typeof event.data === 'string') {
-                    console.log("Received JSON message:", event.data);
                     handleJsonMessage(JSON.parse(event.data));
                 } else {
-                    console.log("Received audio chunk (blob). Size:", event.data.size);
                     handleAudioChunk(event.data);
                 }
             };
@@ -178,12 +266,14 @@
             socket.onerror = (err) => {
                 updateStatus(`WebSocket Error: Check console.`);
                 console.error("WebSocket Error:", err);
+                stopTimer();
             };
 
             socket.onclose = (event) => {
                 updateStatus(`WebSocket Closed. Code: ${event.code}`);
                 console.log("WebSocket Close Event:", event);
                 enableAll(false);
+                stopTimer();
             };
         };
 
@@ -195,15 +285,14 @@
                     updateStatus("AI is speaking...");
                     btnPushToTalk.disabled = true;
                     btnEndGame.disabled = true;
-                    audioQueue = []; // Clear queue for new AI response
+                    audioQueue = [];
+                    showTypingIndicator();
                     break;
                 case "ai_finished_speaking":
                     updateStatus("Your turn. Hold to speak.");
                     btnPushToTalk.disabled = false;
                     btnEndGame.disabled = false;
-                    // --- THIS IS THE FIX ---
-                    playFullAudio(); // Play the combined audio
-                    // --- END FIX ---
+                    playFullAudio();
                     break;
                 case "ai_thinking":
                     updateStatus("AI is thinking...");
@@ -214,6 +303,7 @@
                     updateStatus("Evaluating your performance...");
                     btnPushToTalk.disabled = true;
                     btnEndGame.disabled = true;
+                    stopTimer();
                     break;
                 case "game_over":
                     updateStatus("Game Over!");
@@ -221,10 +311,14 @@
                         <h3>Final Score: ${data.score}/10</h3>
                         <p><strong>Justification:</strong> ${data.justification}</p>
                     `;
-                    
-                    setTimeout(() => socket.close(), 500);
-                    
-
+                    stopTimer();
+                    socket.close();
+                    break;
+                case "user_response_text":
+                    addMessageToChat('user', data.text);
+                    break;
+                case "ai_response_text":
+                    pendingAIMessage = data.text;
                     break;
                 case "error":
                     updateStatus(`Error: ${data.message}`);
@@ -232,61 +326,52 @@
             }
         }
 
-        // --- 4. Handle Audio (THE FIX) ---
+        // --- 4. Handle Audio ---
         function handleAudioChunk(audioChunk) {
-            // Just collect the chunks, don't play them yet
             audioQueue.push(audioChunk);
         }
 
         function playFullAudio() {
-            if (audioQueue.length === 0) {
-                console.log("No audio chunks to play.");
-                return;
-            }
-
+            if (audioQueue.length === 0) return;
             console.log("Combining audio chunks and playing...");
-            // Combine all collected blobs into one single blob
             const fullAudioBlob = new Blob(audioQueue, { type: 'audio/wav' });
-            
             const audioUrl = URL.createObjectURL(fullAudioBlob);
-            
             audioPlayer.src = audioUrl;
-            audioPlayer.play().catch(e => console.error("Audio play error:", e)); // Added error handling
-
-            // Clear the queue for the next AI turn
+            
+            // Show AI message when audio starts playing
+            audioPlayer.onplay = () => {
+                hideTypingIndicator();
+                if (pendingAIMessage) {
+                    addMessageToChat('ai', pendingAIMessage);
+                    pendingAIMessage = '';
+                }
+            };
+            
+            audioPlayer.play().catch(e => console.error("Audio play error:", e));
             audioQueue = [];
         }
-
-        // We don't need the onended listener anymore
-        // audioPlayer.onended = () => ...
 
         // --- 5. Push-to-Talk ---
         btnPushToTalk.onmousedown = async () => {
             if (!socket) return;
-            console.log("--- 3. PUSH-TO-TALK (START) ---");
-            
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                console.log("Microphone access granted.");
                 mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' }); 
 
                 mediaRecorder.ondataavailable = (event) => {
                     if (event.data.size > 0 && socket.readyState === WebSocket.OPEN) {
-                        console.log("Sending audio chunk. Size:", event.data.size);
                         socket.send(event.data);
                     }
                 };
                 
                 mediaRecorder.onstop = () => {
-                    console.log("MediaRecorder stopped. Sending 'stop_speaking' action.");
                     if (socket.readyState === WebSocket.OPEN) {
                         sendJson({ action: "stop_speaking" });
                     }
                     stream.getTracks().forEach(track => track.stop());
                 };
                 
-                mediaRecorder.start(500); // Send 500ms chunks
-                console.log("MediaRecorder started. Sending 'start_speaking' action.");
+                mediaRecorder.start(500);
                 sendJson({ action: "start_speaking" });
                 updateStatus("Listening... Release to stop.");
 
@@ -298,17 +383,90 @@
 
         btnPushToTalk.onmouseup = () => {
             if (mediaRecorder) {
-                console.log("--- 4. PUSH-TO-TALK (STOP) ---");
                 mediaRecorder.stop();
                 updateStatus("AI is thinking...");
             }
         };
 
-        // --- 6. End Game ---
+        // --- 6. End Game Button ---
         btnEndGame.onclick = () => {
-            console.log("--- 5. ENDING GAME ---");
-            sendJson({ action: "end_game" });
+            endGame();
         };
+
+        // --- 7. Timer Functions ---
+        function startTimer() {
+            timeLeft = 120;
+            updateTimerDisplay();
+            stopTimer();
+
+            timerInterval = setInterval(() => {
+                timeLeft--;
+                updateTimerDisplay();
+                
+                if (timeLeft <= 30) {
+                    timerDiv.classList.add('low');
+                }
+
+                if (timeLeft <= 0) {
+                    console.log("Timer finished, auto-ending game.");
+                    stopTimer();
+                    endGame(true);
+                }
+            }, 1000);
+        }
+
+        function stopTimer() {
+            if (timerInterval) {
+                clearInterval(timerInterval);
+                timerInterval = null;
+            }
+            timeLeft = 120;
+            timerDiv.classList.remove('low');
+        }
+
+        function updateTimerDisplay() {
+            const minutes = Math.floor(timeLeft / 60);
+            const seconds = timeLeft % 60;
+            timerDiv.textContent = `Time left: ${minutes}:${seconds.toString().padStart(2, '0')}`;
+        }
+        
+        // --- 8. End Game Function ---
+        function endGame(isAutoEnd = false) {
+            if (isAutoEnd) {
+                updateStatus("Time's up! Evaluating...");
+            } else {
+                console.log("User clicked End Game.");
+            }
+            sendJson({ action: "end_game" });
+            btnPushToTalk.disabled = true;
+            btnEndGame.disabled = true;
+        }
+
+        // --- 9. Chat Log Function ---
+        function addMessageToChat(role, text) {
+            const msgDiv = document.createElement('div');
+            msgDiv.classList.add('message', role);
+            msgDiv.textContent = text;
+            chatLog.appendChild(msgDiv);
+            chatLog.scrollTop = chatLog.scrollHeight;
+        }
+        
+        // --- 10. Typing Indicator Functions ---
+        function showTypingIndicator() {
+            hideTypingIndicator();
+            typingIndicator = document.createElement('div');
+            typingIndicator.classList.add('typing-indicator');
+            typingIndicator.innerHTML = '<span></span><span></span><span></span>';
+            chatLog.appendChild(typingIndicator);
+            chatLog.scrollTop = chatLog.scrollHeight;
+        }
+        
+        function hideTypingIndicator() {
+            if (typingIndicator && typingIndicator.parentNode) {
+                typingIndicator.parentNode.removeChild(typingIndicator);
+                typingIndicator = null;
+            }
+        }
 
         // --- Helper Functions ---
         function sendJson(data) {
@@ -329,7 +487,6 @@
             btnPushToTalk.disabled = true;
             btnEndGame.disabled = true;
         }
-
     </script>
 </body>
 </html>
