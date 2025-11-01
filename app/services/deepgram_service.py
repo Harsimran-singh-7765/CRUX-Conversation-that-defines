@@ -8,10 +8,7 @@ logger = logging.getLogger(__name__)
 
 # --- Voice Models ---
 MALE_VOICES = [
-    "aura-2-odysseus-en", "aura-2-apollo-en", "aura-2-arcas-en", "aura-2-aries-en",
-    "aura-2-atlas-en", "aura-2-draco-en", "aura-2-hermes-en", "aura-2-hyperion-en",
-    "aura-2-jupiter-en", "aura-2-mars-en", "aura-2-neptune-en", "aura-2-orion-en",
-    "aura-2-orpheus-en", "aura-2-pluto-en", "aura-2-saturn-en", "aura-2-zeus-en"
+  "aura-2-saturn-en"
 ]
 
 FEMALE_VOICES = [

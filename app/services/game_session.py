@@ -27,13 +27,24 @@ class GameSessionManager:
         """Removes characters that should not be spoken by TTS."""
         logger.info(f"[{self.session_id}] Cleaning text for TTS...")
         
-        # Simple string replacement
         cleaned_text = text.replace("*", "") 
         cleaned_text = cleaned_text.replace("#", "")
-        # Aap yahaan aur bhi rules add kar sakte ho (jaise markdown links hatana)
         
         logger.info(f"[{self.session_id}] Cleaned text: '{cleaned_text[:60]}...'")
         return cleaned_text
+    
+    def _split_angry_response(self, text: str) -> list[str]:
+        """
+        Splits text by 'BREAK' keyword for angry spam streak effect.
+        Returns list of individual messages.
+        """
+        if "BREAK" not in text:
+            return [text]
+        
+        # Split by BREAK and clean up empty strings
+        messages = [msg.strip() for msg in text.split("BREAK") if msg.strip()]
+        logger.info(f"[{self.session_id}] Split angry response into {len(messages)} messages")
+        return messages
     
     async def _load_session_data(self, retries=3, delay=0.5) -> bool:
         logger.info(f"[{self.session_id}] Loading session data...")
@@ -55,22 +66,97 @@ class GameSessionManager:
 
     async def _send_json(self, data: dict):
         if self.is_active:
-            # --- ADDED LOG ---
             logger.debug(f"[{self.session_id}] Sending JSON to client: {json.dumps(data)}")
-            # ---
             await self.websocket.send_text(json.dumps(data))
 
-    async def _stream_ai_audio(self, text: str, gender: str):
-        # --- MODIFIED LOG (longer text preview) ---
-        logger.info(f"[{self.session_id}] Streaming AI audio: '{text[:80]}...'")
+    async def _generate_audio_for_message(self, text: str, gender: str) -> bytes:
+        """
+        Generates complete audio for a single message.
+        Returns audio as bytes.
+        """
+        logger.info(f"[{self.session_id}] Generating audio for: '{text[:50]}...'")
+        audio_chunks = []
+        
+        try:
+            async for chunk in deepgram_service.text_to_speech_stream(text, gender):
+                audio_chunks.append(chunk)
+            
+            # Combine all chunks into single audio blob
+            full_audio = b''.join(audio_chunks)
+            logger.info(f"[{self.session_id}] Generated {len(full_audio)} bytes of audio")
+            return full_audio
+            
+        except Exception as e:
+            logger.error(f"[{self.session_id}] Audio generation error: {e}")
+            return b''
+
+    async def _stream_angry_spam(self, messages: list[str], gender: str):
+        """
+        Sends angry spam streak: multiple messages with audio rapidly.
+        """
+        logger.info(f"[{self.session_id}] 🔥 ANGRY SPAM ACTIVATED! {len(messages)} messages incoming!")
+        
+        # Signal spam streak is starting
+        await self._send_json({
+            "status": "angry_spam_streak",
+            "message_count": len(messages)
+        })
+        
+        # Generate audio for all messages in parallel
+        audio_tasks = [
+            self._generate_audio_for_message(self._clean_text_for_tts(msg), gender) 
+            for msg in messages
+        ]
+        audio_array = await asyncio.gather(*audio_tasks)
+        
+        # Send all messages and audio to frontend
+        for idx, (message, audio) in enumerate(zip(messages, audio_array)):
+            if not self.is_active:
+                break
+                
+            logger.info(f"[{self.session_id}] 💥 Spam #{idx+1}/{len(messages)}: '{message[:40]}...'")
+            
+            # Send text
+            await self._send_json({
+                "status": "spam_message",
+                "index": idx,
+                "total": len(messages),
+                "text": message
+            })
+            
+            # Send audio
+            if audio:
+                await self.websocket.send_bytes(audio)
+        
+        # Signal spam streak is complete
+        await self._send_json({"status": "spam_streak_complete"})
+        logger.info(f"[{self.session_id}] ✅ Angry spam streak complete")
+
+    async def _stream_ai_audio(self, original_text: str, gender: str):
+        """
+        Streams AI audio. Detects BREAK keyword for angry spam mode.
+        IMPORTANT: Pass ORIGINAL text, not cleaned text!
+        """
+        logger.info(f"[{self.session_id}] Processing AI response: '{original_text[:80]}...'")
+        
+        # 🔥 CRITICAL: Check for BREAK in ORIGINAL text BEFORE cleaning
+        if "BREAK" in original_text:
+            logger.warning(f"[{self.session_id}] ⚠️ BREAK detected in original text! Triggering spam mode...")
+            messages = self._split_angry_response(original_text)
+            await self._stream_angry_spam(messages, gender)
+            return
+        
+        # Normal single-message audio streaming
+        logger.info(f"[{self.session_id}] Normal mode - streaming single message")
         await self._send_json({"status": "ai_speaking"})
 
         try:
-            async for chunk in deepgram_service.text_to_speech_stream(text, gender):
+            # Clean text ONLY for TTS
+            cleaned_text = self._clean_text_for_tts(original_text)
+            
+            async for chunk in deepgram_service.text_to_speech_stream(cleaned_text, gender):
                 if self.is_active:
-                    # --- ADDED LOG ---
                     logger.debug(f"[{self.session_id}] Sending audio chunk to client: {len(chunk)} bytes")
-                    # ---
                     await self.websocket.send_bytes(chunk)
 
             await self._send_json({"status": "ai_finished_speaking"})
@@ -84,14 +170,12 @@ class GameSessionManager:
         """Start Deepgram real-time transcription."""
         logger.info(f"[{self.session_id}] Starting STT...")
         self.transcriber = deepgram_service.get_live_transcriber()
-        self.transcriber.start() # This is synchronous
+        self.transcriber.start()
 
     async def _handle_user_speech(self, audio_chunk: bytes):
         """Send audio data to the transcriber."""
         if self.transcriber and self.transcriber._is_active:
-            # --- ADDED LOG ---
             logger.debug(f"[{self.session_id}] Sending audio chunk to STT: {len(audio_chunk)} bytes")
-            # ---
             await asyncio.to_thread(self.transcriber.send, audio_chunk)
 
     async def _stop_stt_and_process_transcript(self):
@@ -101,60 +185,47 @@ class GameSessionManager:
 
         logger.info(f"[{self.session_id}] Stopping STT...")
         
-        transcript = self.transcriber.stop() # This is synchronous
+        transcript = self.transcriber.stop()
         self.transcriber = None
 
-        # --- ADDED LOG ---
         logger.debug(f"[{self.session_id}] Raw transcript from Deepgram: '{transcript}'")
-        # ---
 
         if transcript and isinstance(transcript, str) and transcript.strip():
             await self._process_user_transcript(transcript)
         else:
             logger.warning(f"[{self.session_id}] Empty or invalid transcript.")
             await self._send_json({"status": "ai_finished_speaking"})
+
     async def _process_user_transcript(self, text: str):
-            if not self.session or not self.scenario:
-                logger.error(f"[{self.session_id}] Error: _process_user_transcript called with no session or scenario.")
-                return
-                
-            logger.info(f"[{self.session_id}] User said: '{text}'")
+        if not self.session or not self.scenario:
+            logger.error(f"[{self.session_id}] Error: _process_user_transcript called with no session or scenario.")
+            return
             
-            # --- FIX #1: Send user's text to UI immediately ---
-            await self._send_json({"status": "user_response_text", "text": text})
-            # ---
+        logger.info(f"[{self.session_id}] User said: '{text}'")
+        
+        await self._send_json({"status": "user_response_text", "text": text})
 
-            self.session.conversation_history.append(ConversationEntry(role="user", message=text))
-            await self._send_json({"status": "ai_thinking"})
+        self.session.conversation_history.append(ConversationEntry(role="user", message=text))
+        await self._send_json({"status": "ai_thinking"})
 
-            try:
-                response = await asyncio.to_thread(
-                    llm_service.get_ai_response, self.session, self.scenario
-                )
-                # --- ADDED LOG ---
-                logger.info(f"[{self.session_id}] AI response received from LLM: '{response}'")
-                # ---
-                
-                self.session.conversation_history.append(ConversationEntry(role="ai", message=response))
-                
-                # --- FIX #2: Send AI's (RAW) text to UI *before* audio ---
-                # Frontend ko original message bhej do taaki woh asterisks (*) dikha sake
-                await self._send_json({"status": "ai_response_text", "text": response})
-                # ---
-                
-                # --- ADVANCEMENT #1: TTS ke liye text ko clean karo ---
-                # TTS ko 'response' (original) mat bhej
-                tts_text = self._clean_text_for_tts(response) 
-                
-                # Ab TTS ko 'tts_text' (cleaned) bhej
-                await self._stream_ai_audio(tts_text, self.scenario.character_gender)
-                # --- END OF ADVANCEMENT ---
+        try:
+            response = await asyncio.to_thread(
+                llm_service.get_ai_response, self.session, self.scenario
+            )
+            logger.info(f"[{self.session_id}] AI response received from LLM: '{response}'")
+            
+            self.session.conversation_history.append(ConversationEntry(role="ai", message=response))
+            
+            # Send original response (with BREAK) to UI for display
+            await self._send_json({"status": "ai_response_text", "text": response})
+            
+            # 🔥 CRITICAL: Pass ORIGINAL response (with BREAK intact) to audio streaming
+            await self._stream_ai_audio(response, self.scenario.character_gender)
 
-            except Exception as e:
-                logger.error(f"[{self.session_id}] AI response error: {e}", exc_info=True)
-                await self._send_json({"status": "error", "message": "AI processing failed"})
+        except Exception as e:
+            logger.error(f"[{self.session_id}] AI response error: {e}", exc_info=True)
+            await self._send_json({"status": "error", "message": "AI processing failed"})
 
-    # ... (aapka baaki saara code)
     async def _handle_end_game(self):
         if not self.session or not self.scenario:
              logger.error(f"[{self.session_id}] Error: _handle_end_game called with no session or scenario.")
@@ -165,9 +236,7 @@ class GameSessionManager:
             result = await asyncio.to_thread(
                 llm_service.evaluate_conversation, self.session, self.scenario
             )
-            # --- ADDED LOG ---
             logger.info(f"[{self.session_id}] Evaluation result: Score={result.score}, Justification='{result.justification}'")
-            # ---
             await db_service.db_end_game_session(
                 session_id=self.session.session_id,
                 score=result.score,
@@ -191,21 +260,16 @@ class GameSessionManager:
             self.is_active = False
             return
         
-        # --- FIX #3: REVERTED. We MUST play the first audio message. ---
+        # Pass original message for first audio
         await self._stream_ai_audio(self.session.conversation_history[0].message, self.scenario.character_gender)
-        # ---
 
         while self.is_active:
             try:
                 data = await self.websocket.receive()
-                # --- ADDED LOG ---
                 logger.debug(f"[{self.session_id}] Received data type: {data['type']}")
-                # ---
                 if data["type"] == "websocket.receive":
                     if "text" in data and data["text"] is not None:
-                        # --- ADDED LOG ---
                         logger.debug(f"[{self.session_id}] Received JSON string from client: {data['text']}")
-                        # ---
                         msg = json.loads(data["text"])
                         action = msg.get("action")
                         if action == "start_speaking":
@@ -217,9 +281,7 @@ class GameSessionManager:
                         elif action == "end_game":
                             await self._handle_end_game()
                     elif "bytes" in data:
-                        # --- ADDED LOG ---
                         logger.debug(f"[{self.session_id}] Received audio bytes from client: {len(data['bytes'])}")
-                        # ---
                         await self._handle_user_speech(data["bytes"])
             except WebSocketDisconnect:
                 logger.info(f"[{self.session_id}] WebSocket disconnected.")
@@ -231,7 +293,7 @@ class GameSessionManager:
         if self.transcriber:
             try:
                 if hasattr(self.transcriber, '_is_active') and self.transcriber._is_active:
-                    self.transcriber.stop() # Sync
+                    self.transcriber.stop()
             except Exception as e:
                 logger.error(f"[{self.session_id}] Error during cleanup: {e}")
             finally:

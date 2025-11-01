@@ -43,31 +43,61 @@ def get_ai_response(session: GameSession, scenario: Scenario) -> str:
     logger.info(f"Generating AI response for session: {session.session_id}")
     transcript = _format_history_for_llm(session.conversation_history)
     
+    # Count how many times user has been dismissive/rude
+    user_messages = [e.message.lower() for e in session.conversation_history if e.role == "user"]
+    anger_triggers = ["fuck", "don't care", "break up", "grow up", "stop", "child", "whatever", "shut up"]
+    anger_level = sum(1 for msg in user_messages for trigger in anger_triggers if trigger in msg)
+    
+    # ✅ CHANGE: character_prompt → personality_prompt
     prompt = f"""
     You are a character in a high-stakes conversation.
-    YOUR SECRET PROMPT: "{scenario.character_prompt}"
+    YOUR SECRET PROMPT: "{scenario.personality_prompt}"
     CONVERSATION HISTORY:
     {transcript}
     
-    You are the AI. It is your turn to speak. 
-    Based *only* on your secret prompt and the history, generate your next response.
-    Do not add 'AI:' or any other prefix. Just say your line.
+    CURRENT ANGER LEVEL: {anger_level}/5
+    
+    IMPORTANT INSTRUCTIONS:
+    1. You are the AI. It is your turn to speak.
+    2. Based on your secret prompt and the history, generate your next response.
+    3. Do not add 'AI:' or any other prefix. Just say your line.
+    
+    4. **ANGRY SPAM MECHANIC:**
+       - If the user is being extremely dismissive, rude, or hurtful (especially with profanity or breakup threats)
+       - AND your anger level is 2 or higher
+       - You can use "BREAK" to split your response into rapid-fire emotional bursts
+       - Each segment between BREAK will be delivered as a separate angry message
+       - Use 2-5 segments maximum
+       - Each segment should be SHORT (5-15 words) and emotionally charged
+       
+    EXAMPLE OF ANGRY SPAM MODE:
+    "Are you SERIOUS right now? BREAK After everything I've done for you? BREAK You forgot MY BIRTHDAY! BREAK And now you're telling ME to grow up? BREAK Unbelievable!"
+    
+    NORMAL RESPONSE (if not very angry):
+    "That really hurts. I can't believe you forgot my birthday..."
+    
+    Current situation: The user has triggered {anger_level} anger points. Respond accordingly.
     """
     
     try:
-        model_name = "gemini-2.0-flash" # The model that worked in your test
+        model_name = "gemini-2.0-flash"
 
         config = types.GenerateContentConfig(temperature=0.9)
         response = llm_client.models.generate_content(
             model=model_name,
-            # --- THIS IS THE FIX ---
-            # Pass the prompt string directly, as per the documentation
             contents=prompt,
-            # --- END FIX ---
             config=config 
         )
         ai_message = response.text.strip()
-        logger.info(f"AI Response generated: {ai_message[:50]}...")
+        
+        # Log if spam mode is triggered
+        if "BREAK" in ai_message:
+            segments = [s.strip() for s in ai_message.split("BREAK") if s.strip()]
+            logger.info(f"🔥 ANGRY SPAM MODE TRIGGERED! {len(segments)} segments")
+            logger.info(f"Preview: {segments[0][:30]}...")
+        else:
+            logger.info(f"AI Response generated: {ai_message[:50]}...")
+            
         return ai_message
     except Exception as e:
         logger.error(f"Error during AI response generation: {e}")
@@ -80,20 +110,25 @@ def evaluate_conversation(session: GameSession, scenario: Scenario) -> Evaluatio
     logger.info(f"Evaluating conversation for session: {session.session_id}")
     transcript = _format_history_for_llm(session.conversation_history)
     
+    # ✅ CHANGE: scenario.description removed (doesn't exist in new schema)
+    # Use scenario.title and personality_prompt instead
     prompt = f"""
     You are a conversation evaluator. Your task is to rate the user's performance.
-    THE USER'S GOAL: "{scenario.description}"
+    SCENARIO: "{scenario.title}"
+    CHARACTER CONTEXT: "{scenario.personality_prompt[:200]}..."
+    
     FULL CONVERSATION TRANSCRIPT:
     {transcript}
     
     INSTRUCTIONS:
-    Rate the user's success from 1-10.
+    Rate how well the user handled this difficult conversation from 1-10.
+    Consider: empathy, de-escalation, acknowledgment, resolution attempts.
     Provide a one-sentence justification.
     You must return *ONLY* a valid JSON object with keys "score" (int) and "justification" (str).
     """
     
     try:
-        model_name = "gemini-2.0-flash" # The model that worked in your test
+        model_name = "gemini-2.0-flash"
 
         config = types.GenerateContentConfig(
             response_mime_type="application/json",
@@ -101,10 +136,7 @@ def evaluate_conversation(session: GameSession, scenario: Scenario) -> Evaluatio
         )
         response = llm_client.models.generate_content(
             model=model_name,
-            # --- THIS IS THE FIX ---
-            # Pass the prompt string directly, as per the documentation
             contents=prompt,
-            # --- END FIX ---
             config=config
         )
         
