@@ -4,204 +4,345 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Crux Test Client</title>
+    <link href="https://fonts.googleapis.com/css2?family=Permanent+Marker&family=Kalam:wght@700&display=swap" rel="stylesheet">
     <style>
+        :root {
+            --color-bg: #1B2021;
+            --color-light-green: #D8F8B6;
+            --color-blue: #00BFFF;
+            --color-pink: #FF69B4;
+            --color-yellow: #FFEB3B;
+            --color-text-dark: #333;
+            --color-text-light: white;
+            --border-thickness: 3px;
+        }
+
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background-color: #FFFDEB;
-            color: #333;
+            font-family: 'Kalam', cursive, sans-serif; 
+            background-color: var(--color-light-green);
+            color: var(--color-text-light);
             display: flex;
-            flex-direction: column;
             align-items: center;
             justify-content: center;
             min-height: 100vh;
             margin: 0;
-            padding: 1rem;
+            padding: 20px;
             box-sizing: border-box;
+            font-size: 16px;
+            overflow-x: hidden;
         }
-        .container {
+
+        .main-layout {
+            display: flex;
+            gap: 2rem;
+            align-items: center;
+            justify-content: space-between;
             width: 100%;
-            max-width: 600px;
-            background: #fff;
-            border-radius: 12px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.05);
-            padding: 2rem;
-            text-align: center;
+            max-width: 1800px;
         }
-        h1 {
-            color: #D9534F;
-            margin-top: 0;
+
+        .visualizer-container {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        canvas.visualizer {
+            display: block;
+            filter: drop-shadow(0 0 20px rgba(255, 105, 180, 0.5));
+        }
+
+        .sketch-box {
+            border: var(--border-thickness) solid black;
+            box-shadow: var(--border-thickness) var(--border-thickness) 0 0 black;
+            transition: transform 0.1s, box-shadow 0.1s;
+        }
+
+        .sketch-box:hover {
+            transform: translate(1px, 1px);
+            box-shadow: calc(var(--border-thickness) - 1px) calc(var(--border-thickness) - 1px) 0 0 black;
         }
         
-        /* Scenario Generator Section */
-        #generatorSection {
-            background: #f8f9fa;
-            border-radius: 8px;
+        .sketch-box.interactive:hover {
+            cursor: pointer;
+        }
+
+        .container {
+            flex: 0 0 auto;
+            width: 700px;
+            background: var(--color-light-green);
             padding: 1.5rem;
-            margin-bottom: 1.5rem;
-            text-align: left;
+            text-align: center;
+            color: var(--color-text-dark);
+            border: var(--border-thickness) solid black;
+            box-shadow: var(--border-thickness) var(--border-thickness) 0 0 black;
         }
-        #generatorSection h3 {
+
+        h1 {
+            font-family: 'Permanent Marker', cursive;
+            font-size: 2.5rem;
+            color: black;
             margin-top: 0;
-            color: #5CB85C;
+            margin-bottom: 1rem;
+            text-shadow: 2px 2px 0px rgba(0,0,0,0.5);
         }
+        h1::after {
+            content: '🎙️';
+            margin-left: 10px;
+            font-size: 2.2rem;
+            vertical-align: middle;
+        }
+        
+        #generatorSection {
+            padding: 1rem;
+            margin-bottom: 1rem;
+            background: white;
+        }
+        
+        #generatorSection h3 {
+            font-size: 1.3rem;
+            color: black;
+            margin-top: 0;
+            margin-bottom: 0.8rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+        #generatorSection h3::before {
+            content: '✨';
+            font-size: 1.5rem;
+        }
+
         #descriptionInput {
             width: 100%;
-            padding: 0.8rem;
-            border: 2px solid #ddd;
-            border-radius: 6px;
-            font-size: 1rem;
+            padding: 0.6rem;
+            background-color: white;
+            color: var(--color-text-dark);
+            font-size: 0.9rem;
             margin-bottom: 0.5rem;
             box-sizing: border-box;
             resize: vertical;
             min-height: 80px;
+            border: var(--border-thickness) solid black;
+            box-shadow: var(--border-thickness) var(--border-thickness) 0 0 black;
+            font-family: 'Kalam', cursive, sans-serif;
         }
+        #descriptionInput::placeholder {
+            color: #888;
+        }
+
         #charCount {
-            font-size: 0.85rem;
-            color: #666;
-            margin-bottom: 0.8rem;
+            font-size: 0.8rem;
+            color: var(--color-text-dark);
+            margin-bottom: 0.5rem;
+            text-align: right;
+            width: 100%;
         }
         #charCount.warning {
-            color: #f0ad4e;
+            color: var(--color-yellow);
+            font-weight: bold;
         }
         #charCount.error {
-            color: #D9534F;
+            color: var(--color-pink);
+            font-weight: bold;
         }
-        .generator-buttons {
-            display: flex;
-            gap: 0.5rem;
-            flex-wrap: wrap;
-        }
-        #btnGenerate {
-            background-color: #5CB85C;
-            color: white;
-            flex: 1;
-            min-width: 150px;
-        }
-        #btnGenerate:disabled {
-            background-color: #ccc;
-        }
+
         .example-chips {
             display: flex;
             gap: 0.5rem;
             flex-wrap: wrap;
             margin-bottom: 1rem;
+            justify-content: center;
         }
         .example-chip {
-            background: #e0e0e0;
+            background: white;
             padding: 0.4rem 0.8rem;
-            border-radius: 16px;
-            font-size: 0.85rem;
+            font-size: 0.8rem;
             cursor: pointer;
-            transition: all 0.2s;
+            color: var(--color-text-dark);
+            border: var(--border-thickness) solid black;
+            box-shadow: var(--border-thickness) var(--border-thickness) 0 0 black;
+            font-family: 'Kalam', cursive, sans-serif;
         }
         .example-chip:hover {
-            background: #5BC0DE;
+            background: var(--color-blue);
             color: white;
         }
         
-        #status {
-            font-size: 1.2rem;
+        button {
+            font-size: 0.95rem;
+            padding: 0.6rem 1.2rem;
+            border: none;
+            cursor: pointer;
+            margin: 0.3rem 0.2rem;
+            transition: all 0.1s ease;
             font-weight: bold;
-            color: #5BC0DE;
-            margin: 1rem 0;
+            text-transform: uppercase;
+            font-family: 'Kalam', cursive, sans-serif;
+            border: var(--border-thickness) solid black;
+            box-shadow: var(--border-thickness) var(--border-thickness) 0 0 black;
+        }
+        button:disabled {
+            cursor: not-allowed;
+            opacity: 0.5;
+            transform: none;
+            box-shadow: var(--border-thickness) var(--border-thickness) 0 0 black;
+        }
+
+        #btnGenerate {
+            background-color: var(--color-blue);
+            color: white;
+            width: 100%;
+        }
+        #btnStartGame, #btnConnect {
+            background-color: var(--color-blue);
+            color: white;
+        }
+        #btnRefreshScenarios {
+            background-color: var(--color-yellow);
+            color: black;
+            padding: 0.4rem 0.8rem;
+            font-size: 0.9rem;
+        }
+        #btnPushToTalk {
+            background-color: var(--color-pink);
+            color: white;
+            width: 80%;
             padding: 1rem;
-            background: #f0f8ff;
-            border-radius: 8px;
+            font-size: 1.2rem;
+        }
+        #btnPushToTalk:active:not(:disabled) {
+            background-color: var(--color-text-dark);
+            transform: translate(var(--border-thickness), var(--border-thickness));
+            box-shadow: 0 0 0 0 transparent;
+        }
+        #btnEndGame {
+            background-color: var(--color-pink);
+            color: white;
+        }
+        
+        .generator-buttons {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        #status {
+            font-size: 1.1rem;
+            font-weight: bold;
+            color: black;
+            margin: 1rem 0;
+            padding: 0.8rem;
+            background: white;
             min-height: 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: var(--border-thickness) solid black;
+            box-shadow: var(--border-thickness) var(--border-thickness) 0 0 black;
         }
         
         #timer {
             font-size: 1.5rem;
             font-weight: bold;
-            color: #5CB85C;
+            color: black;
             margin-bottom: 1rem;
+            padding: 8px;
+            background: white;
+            border: var(--border-thickness) solid black;
+            box-shadow: var(--border-thickness) var(--border-thickness) 0 0 black;
         }
         #timer.low {
-            color: #D9534F;
+            color: var(--color-pink);
             animation: pulse 1s infinite;
         }
         @keyframes pulse {
             0% { transform: scale(1); }
-            50% { transform: scale(1.05); }
+            50% { transform: scale(1.03); }
             100% { transform: scale(1); }
         }
 
-        /* Scenario Selection */
         .scenario-selector {
             margin-bottom: 1rem;
+            width: 100%;
+        }
+        .scenario-selector label {
+            font-weight: bold;
+            font-size: 1rem;
+            color: black;
         }
         .scenario-header {
             display: flex;
             gap: 0.5rem;
             align-items: center;
-            margin-bottom: 0.5rem;
+            margin-top: 0.5rem;
         }
         #scenarioSelect {
             flex: 1;
-            padding: 0.5rem;
-            font-size: 1rem;
-            border-radius: 4px;
-            border: 1px solid #ddd;
-        }
-        #btnRefreshScenarios {
-            background-color: #5BC0DE;
-            color: white;
-            padding: 0.5rem 1rem;
-            border-radius: 4px;
-            border: none;
-            cursor: pointer;
+            padding: 0.6rem;
             font-size: 0.9rem;
-        }
-        #btnRefreshScenarios:disabled {
-            background-color: #ccc;
-            cursor: not-allowed;
+            color: var(--color-text-dark);
+            background-color: white;
+            border: var(--border-thickness) solid black;
+            box-shadow: var(--border-thickness) var(--border-thickness) 0 0 black;
+            font-family: 'Kalam', cursive, sans-serif;
         }
 
         #chatLog {
             width: 100%;
             height: 200px;
             overflow-y: scroll;
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            padding: 1rem;
-            margin-bottom: 1.5rem;
+            padding: 0.8rem;
+            margin-bottom: 1rem;
             text-align: left;
-            background: #f9f9f9;
+            background: #fff;
             box-sizing: border-box; 
+            color: var(--color-text-dark);
+            border: var(--border-thickness) solid black;
+            box-shadow: var(--border-thickness) var(--border-thickness) 0 0 black;
+            font-family: 'Kalam', cursive, sans-serif;
+            font-size: 0.85rem;
         }
         .message {
             margin-bottom: 0.5rem;
             padding: 0.5rem 0.8rem;
-            border-radius: 10px;
-            max-width: 80%;
+            max-width: 75%;
             word-wrap: break-word;
+            border: 1px solid #ccc; 
+            box-shadow: 1px 1px 0 0 #ccc;
         }
         .message.user {
-            background-color: #5BC0DE;
+            background-color: var(--color-blue);
             color: white;
             margin-left: auto;
-            border-bottom-right-radius: 0;
+            border-color: var(--color-blue);
+            box-shadow: 1px 1px 0 0 var(--color-blue);
         }
         .message.ai {
             background-color: #e0e0e0;
-            color: #333;
+            color: var(--color-text-dark);
             margin-right: auto;
-            border-bottom-left-radius: 0;
+            border-color: #e0e0e0;
+            box-shadow: 1px 1px 0 0 #e0e0e0;
         }
-        
         .message.ai.spam {
-            background-color: #ff6b6b;
+            background-color: var(--color-pink);
             color: white;
             animation: spamPop 0.3s ease-out;
             font-weight: bold;
+            border-color: var(--color-pink);
+            box-shadow: 1px 1px 0 0 var(--color-pink);
         }
         @keyframes spamPop {
             0% { 
-                transform: scale(0.8) translateX(-20px);
+                transform: scale(0.9) translateX(-10px);
                 opacity: 0;
             }
             50% {
-                transform: scale(1.1);
+                transform: scale(1.05);
             }
             100% { 
                 transform: scale(1) translateX(0);
@@ -212,13 +353,14 @@
         .typing-indicator {
             display: flex;
             align-items: center;
-            gap: 4px;
+            gap: 6px;
             padding: 0.5rem 0.8rem;
             background-color: #e0e0e0;
-            border-radius: 10px;
             max-width: 80px;
             margin-right: auto;
             margin-bottom: 0.5rem;
+            border: 1px solid #ccc;
+            box-shadow: 1px 1px 0 0 #ccc;
         }
         .typing-indicator span {
             width: 8px;
@@ -237,48 +379,30 @@
             0%, 60%, 100% { transform: translateY(0); }
             30% { transform: translateY(-10px); }
         }
-        
-        button {
-            font-size: 1rem;
-            padding: 0.8rem 1.5rem;
-            border-radius: 8px;
-            border: none;
-            cursor: pointer;
-            margin: 0.5rem;
-            transition: all 0.2s ease;
-        }
-        button:disabled {
-            cursor: not-allowed;
-            opacity: 0.6;
-        }
-        #btnStartGame, #btnConnect {
-            background-color: #5CB85C;
-            color: white;
-        }
-        #btnPushToTalk {
-            background-color: #5BC0DE;
-            color: white;
-            width: 80%;
-            padding: 1rem;
-            font-size: 1.2rem;
-        }
-        #btnPushToTalk:active:not(:disabled) {
-            background-color: #D9534F;
-            transform: scale(0.98);
-        }
-        #btnEndGame {
-            background-color: #f0ad4e;
-            color: white;
-        }
+
         #results {
-            margin-top: 1.5rem;
-            font-size: 1.1rem;
+            margin-top: 1rem;
+            font-size: 1rem;
+            color: black;
+            background-color: white;
+            padding: 1rem;
+            border: var(--border-thickness) solid black;
+            box-shadow: var(--border-thickness) var(--border-thickness) 0 0 black;
         }
-        
+        #results h3 {
+            font-size: 1.3rem;
+            color: black;
+            margin-top: 0;
+            margin-bottom: 0.8rem;
+        }
+        #results p {
+            margin-bottom: 0;
+        }
+
         .loading {
             display: inline-block;
-            width: 16px;
-            height: 16px;
+            width: 18px;
+            height: 18px;
             border: 3px solid rgba(255,255,255,.3);
             border-radius: 50%;
             border-top-color: #fff;
@@ -287,68 +411,88 @@
         @keyframes spin {
             to { transform: rotate(360deg); }
         }
+
+        @media (max-width: 1200px) {
+            .main-layout {
+                flex-direction: column;
+            }
+            .visualizer-container {
+                display: none;
+            }
+        }
     </style>
 </head>
 <body>
 
-    <div class="container">
-        <h1>Crux Test Client 🎙️</h1>
-        
-        <!-- Scenario Generator Section -->
-        <div id="generatorSection">
-            <h3>✨ Create Custom Scenario</h3>
-            <textarea 
-                id="descriptionInput" 
-                placeholder="Describe a difficult conversation situation... (10-500 characters)&#10;&#10;Examples:&#10;• My mom caught me coming home at 3 AM&#10;• Boss is angry about missed deadline&#10;• Roommate keeps eating my food"
-                maxlength="500"
-            ></textarea>
-            <div id="charCount">0 / 500 characters</div>
-            
-            <div class="example-chips">
-                <div class="example-chip" data-example="My mom caught me sneaking in at 3 AM smelling of alcohol">🏠 Late Night</div>
-                <div class="example-chip" data-example="My boss is furious I missed an important client deadline">💼 Missed Deadline</div>
-                <div class="example-chip" data-example="My roommate keeps eating my food without asking">🍕 Food Thief</div>
-                <div class="example-chip" data-example="A taxi driver is taking a suspicious route late at night">🚕 Sketchy Taxi</div>
-            </div>
-            
-            <div class="generator-buttons">
-                <button id="btnGenerate" disabled>
-                    🤖 Generate Scenario with AI
-                </button>
-            </div>
+    <div class="main-layout">
+        <!-- Left Visualizer -->
+        <div class="visualizer-container">
+            <canvas id="visualizerLeft" class="visualizer" width="250" height="250"></canvas>
         </div>
-        
-        <!-- Scenario Selection -->
-        <div class="scenario-selector">
-            <label style="display: block; margin-bottom: 0.5rem; font-weight: bold;">
-                Choose Scenario:
-            </label>
-            <div class="scenario-header">
-                <select id="scenarioSelect">
-                    <option value="">Loading scenarios...</option>
-                </select>
-                <button id="btnRefreshScenarios" title="Refresh scenario list">🔄</button>
+
+        <!-- Main Content -->
+        <div class="container">
+            <h1>Crux Test Client</h1> 
+            
+            <div id="generatorSection" class="sketch-box">
+                <h3>Create Custom Scenario</h3>
+                <textarea 
+                    id="descriptionInput" 
+                    placeholder="Describe a difficult conversation situation... (10-500 characters)&#10;&#10;Examples:&#10;• My mom caught me coming home at 3 AM&#10;• Boss is angry about missed deadline&#10;• Roommate keeps eating my food"
+                    maxlength="500"
+                ></textarea>
+                <div id="charCount">0 / 500 characters</div>
+                
+                <div class="example-chips">
+                    <div class="example-chip sketch-box interactive" data-example="My mom caught me sneaking in at 3 AM smelling of alcohol">🏠 Late Night</div>
+                    <div class="example-chip sketch-box interactive" data-example="My boss is furious I missed an important client deadline">💼 Missed Deadline</div>
+                    <div class="example-chip sketch-box interactive" data-example="My roommate keeps eating my food without asking">🍕 Food Thief</div>
+                    <div class="example-chip sketch-box interactive" data-example="A taxi driver is taking a suspicious route late at night">🚕 Sketchy Taxi</div>
+                </div>
+                
+                <div class="generator-buttons">
+                    <button id="btnGenerate" disabled class="sketch-box">
+                        🤖 Generate Scenario with AI
+                    </button>
+                </div>
             </div>
+            
+            <div class="scenario-selector">
+                <label style="display: block; margin-bottom: 0.5rem;">
+                    Choose Scenario:
+                </label>
+                <div class="scenario-header">
+                    <select id="scenarioSelect" class="sketch-box">
+                        <option value="">Loading scenarios...</option>
+                    </select>
+                    <button id="btnRefreshScenarios" title="Refresh scenario list" class="sketch-box">🔄</button>
+                </div>
+            </div>
+            
+            <button id="btnStartGame" class="sketch-box">1. Start New Game</button>
+            <button id="btnConnect" disabled class="sketch-box">2. Connect WebSocket</button>
+
+            <div id="timer" class="sketch-box">Time left: 2:00</div>
+
+            <div id="status" class="sketch-box">Waiting to start...</div>
+            <div id="chatLog" class="sketch-box"></div>
+
+            <button id="btnPushToTalk" disabled class="sketch-box">Hold to Speak</button>
+            <button id="btnEndGame" disabled class="sketch-box">End Game & Get Score</button>
+
+            <div id="results" class="sketch-box"></div>
         </div>
-        
-        <button id="btnStartGame">1. Start New Game</button>
-        <button id="btnConnect" disabled>2. Connect WebSocket</button>
 
-        <div id="timer">Time left: 2:00</div>
-
-        <div id="status">Waiting to start...</div>
-        <div id="chatLog"></div>
-
-        <button id="btnPushToTalk" disabled>Hold to Speak</button>
-        <button id="btnEndGame" disabled>End Game & Get Score</button>
-
-        <div id="results"></div>
+        <!-- Right Visualizer -->
+        <div class="visualizer-container">
+            <canvas id="visualizerRight" class="visualizer" width="250" height="250"></canvas>
+        </div>
     </div>
 
     <audio id="audioPlayer"></audio>
 
     <script>
-        // --- DOM Elements ---
+        // DOM Elements
         const btnStartGame = document.getElementById('btnStartGame');
         const btnConnect = document.getElementById('btnConnect');
         const btnPushToTalk = document.getElementById('btnPushToTalk');
@@ -365,7 +509,131 @@
         const charCount = document.getElementById('charCount');
         const exampleChips = document.querySelectorAll('.example-chip');
 
-        // --- State ---
+        // Visualizer Setup
+        const canvasLeft = document.getElementById('visualizerLeft');
+        const canvasRight = document.getElementById('visualizerRight');
+        const ctxLeft = canvasLeft.getContext('2d');
+        const ctxRight = canvasRight.getContext('2d');
+        
+        let audioContext;
+        let analyser;
+        let dataArray;
+        let bufferLength;
+        let animationId;
+        let micAnalyser;
+        let micDataArray;
+        let micBufferLength;
+        let micStream;
+
+        function initAudioContext() {
+            if (!audioContext) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                analyser = audioContext.createAnalyser();
+                analyser.fftSize = 512;
+                bufferLength = analyser.frequencyBinCount;
+                dataArray = new Uint8Array(bufferLength);
+                
+                const source = audioContext.createMediaElementSource(audioPlayer);
+                source.connect(analyser);
+                analyser.connect(audioContext.destination);
+                
+                drawVisualizers();
+            }
+        }
+
+        async function initMicVisualizer(stream) {
+            if (!audioContext) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            
+            micAnalyser = audioContext.createAnalyser();
+            micAnalyser.fftSize = 512;
+            micBufferLength = micAnalyser.frequencyBinCount;
+            micDataArray = new Uint8Array(micBufferLength);
+            
+            const micSource = audioContext.createMediaStreamSource(stream);
+            micSource.connect(micAnalyser);
+            
+            if (!animationId) {
+                drawVisualizers();
+            }
+        }
+
+        function stopMicVisualizer() {
+            micAnalyser = null;
+            micDataArray = null;
+        }
+
+        function drawVisualizers() {
+            animationId = requestAnimationFrame(drawVisualizers);
+            
+            // Left visualizer for AI audio
+            if (analyser) {
+                analyser.getByteFrequencyData(dataArray);
+                drawRadialVisualizer(ctxLeft, canvasLeft, dataArray);
+            } else {
+                drawRadialVisualizer(ctxLeft, canvasLeft, new Uint8Array(128));
+            }
+            
+            // Right visualizer for user mic
+            if (micAnalyser && micDataArray) {
+                micAnalyser.getByteFrequencyData(micDataArray);
+                drawRadialVisualizer(ctxRight, canvasRight, micDataArray);
+            } else {
+                drawRadialVisualizer(ctxRight, canvasRight, new Uint8Array(128));
+            }
+        }
+
+        function drawRadialVisualizer(ctx, canvas, data) {
+            const width = canvas.width;
+            const height = canvas.height;
+            const centerX = width / 2;
+            const centerY = height / 2;
+            const radius = Math.min(width, height) / 3;
+            
+            ctx.fillStyle = 'transparent';
+            ctx.clearRect(0, 0, width, height);
+            
+            const bars = 128;
+            const barWidth = 3;
+            
+            for (let i = 0; i < bars; i++) {
+                const value = data[Math.floor(i * data.length / bars)] || 0;
+                const barHeight = (value / 255) * radius * 0.8;
+                const angle = (i / bars) * Math.PI * 2;
+                
+                const x1 = centerX + Math.cos(angle) * radius;
+                const y1 = centerY + Math.sin(angle) * radius;
+                const x2 = centerX + Math.cos(angle) * (radius + barHeight);
+                const y2 = centerY + Math.sin(angle) * (radius + barHeight);
+                
+                const gradient = ctx.createLinearGradient(x1, y1, x2, y2);
+                gradient.addColorStop(0, '#00BFFF');
+                gradient.addColorStop(0.5, '#FF69B4');
+                gradient.addColorStop(1, '#FFEB3B');
+                
+                ctx.strokeStyle = gradient;
+                ctx.lineWidth = barWidth;
+                ctx.lineCap = 'round';
+                
+                ctx.beginPath();
+                ctx.moveTo(x1, y1);
+                ctx.lineTo(x2, y2);
+                ctx.stroke();
+            }
+            
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, radius - 5, 0, Math.PI * 2);
+            ctx.strokeStyle = '#FF69B4';
+            ctx.lineWidth = 3;
+            ctx.stroke();
+        }
+
+        audioPlayer.addEventListener('play', () => {
+            initAudioContext();
+        });
+
+        // State
         let sessionId = null;
         let socket = null;
         let mediaRecorder = null;
@@ -378,15 +646,15 @@
         let isSpamMode = false;
         let spamQueue = [];
 
-        // --- Config ---
+        // Config
         const API_URL = "http://127.0.0.1:8000";
         const WS_URL = "ws://127.0.0.1:8000";
         const TEST_USER_ID = "html_test_user";
         
-        // --- Initialize ---
+        // Initialize
         loadScenarios();
         
-        // --- Scenario Generator ---
+        // Scenario Generator
         descriptionInput.addEventListener('input', () => {
             const length = descriptionInput.value.length;
             charCount.textContent = `${length} / 500 characters`;
@@ -400,6 +668,7 @@
                 btnGenerate.disabled = false;
             } else {
                 charCount.classList.remove('warning', 'error');
+                btnGenerate.classList.remove('error');
                 btnGenerate.disabled = false;
             }
         });
@@ -437,11 +706,9 @@
                 const data = await response.json();
                 updateStatus(`✅ Created: ${data.scenario.title}`);
                 
-                // Clear input
                 descriptionInput.value = '';
                 charCount.textContent = '0 / 500 characters';
                 
-                // Reload scenarios and select the new one
                 await loadScenarios();
                 scenarioSelect.value = data.scenario.id;
                 
@@ -492,7 +759,6 @@
             return scenarioSelect.value;
         }
 
-        // --- 1. Start Game ---
         btnStartGame.onclick = async () => {
             const scenarioId = getSelectedScenarioId();
             if (!scenarioId) {
@@ -529,7 +795,6 @@
             }
         };
 
-        // --- 2. Connect WebSocket ---
         btnConnect.onclick = () => {
             if (!sessionId) {
                 updateStatus("No session ID. Start a game first.");
@@ -570,7 +835,6 @@
             };
         };
 
-        // --- 3. Handle JSON Messages ---
         function handleJsonMessage(data) {
             console.log("Handling JSON:", data);
             switch (data.status) {
@@ -655,7 +919,6 @@
             }
         }
 
-        // --- 4. Handle Audio ---
         function handleAudioChunk(audioChunk) {
             if (isSpamMode && spamQueue.length > 0) {
                 for (let i = 0; i < spamQueue.length; i++) {
@@ -728,11 +991,24 @@
             btnEndGame.disabled = false;
         }
 
-        // --- 5. Push-to-Talk ---
         btnPushToTalk.onmousedown = async () => {
             if (!socket) return;
+            
+            // Interrupt AI audio if playing
+            if (!audioPlayer.paused) {
+                console.log("🚫 Interrupting AI audio - user started speaking");
+                audioPlayer.pause();
+                audioPlayer.currentTime = 0;
+                resumeTimer();
+            }
+            
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                micStream = stream;
+                
+                // Initialize mic visualizer
+                await initMicVisualizer(stream);
+                
                 mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' }); 
 
                 mediaRecorder.ondataavailable = (event) => {
@@ -746,6 +1022,7 @@
                         sendJson({ action: "stop_speaking" });
                     }
                     stream.getTracks().forEach(track => track.stop());
+                    stopMicVisualizer();
                 };
                 
                 mediaRecorder.start(500);
@@ -765,12 +1042,10 @@
             }
         };
 
-        // --- 6. End Game ---
         btnEndGame.onclick = () => {
             endGame();
         };
 
-        // --- 7. Timer ---
         function startTimer() {
             timeLeft = 120;
             isTimerPaused = false;
@@ -833,7 +1108,6 @@
             btnEndGame.disabled = true;
         }
 
-        // --- 8. Chat ---
         function addMessageToChat(role, text, isSpam = false) {
             const msgDiv = document.createElement('div');
             msgDiv.classList.add('message', role);
@@ -861,7 +1135,6 @@
             }
         }
 
-        // --- Helpers ---
         function sendJson(data) {
             if (socket && socket.readyState === WebSocket.OPEN) {
                 console.log("Sending JSON:", data);
