@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crux Test Client</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #FFFDEB; /* Pastel Yellow */
+            color: #333;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+        .container {
+            width: 90%;
+            max-width: 600px;
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+            padding: 2rem;
+            text-align: center;
+        }
+        h1 {
+            color: #D9534F; /* Pastel Red */
+        }
+        #status {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #5BC0DE; /* Pastel Blue */
+            margin: 1.5rem 0;
+            padding: 1rem;
+            background: #f0f8ff;
+            border-radius: 8px;
+            min-height: 2rem;
+        }
+        button {
+            font-size: 1rem;
+            padding: 0.8rem 1.5rem;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            margin: 0.5rem;
+            transition: all 0.2s ease;
+        }
+        button:disabled {
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+        #btnStartGame, #btnConnect {
+            background-color: #5CB85C; /* Pastel Green */
+            color: white;
+        }
+        #btnPushToTalk {
+            background-color: #5BC0DE; /* Pastel Blue */
+            color: white;
+            width: 80%;
+            padding: 1rem;
+            font-size: 1.2rem;
+        }
+        #btnPushToTalk:active:not(:disabled) {
+            background-color: #D9534F; /* Pastel Red */
+            transform: scale(0.98);
+        }
+        #btnEndGame {
+            background-color: #f0ad4e; /* Pastel Orange */
+            color: white;
+        }
+        #results {
+            margin-top: 1.5rem;
+            font-size: 1.1rem;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Crux Test Client 🎙️</h1>
+        
+        <button id="btnStartGame">1. Start New Game (Forgotten Birthday)</button>
+        <button id="btnConnect" disabled>2. Connect WebSocket</button>
+
+        <div id="status">Waiting to start...</div>
+
+        <button id="btnPushToTalk" disabled>Hold to Speak</button>
+        <button id="btnEndGame" disabled>End Game & Get Score</button>
+
+        <div id="results"></div>
+    </div>
+
+    <audio id="audioPlayer" autoplay></audio>
+
+    <script>
+        // --- DOM Elements ---
+        const btnStartGame = document.getElementById('btnStartGame');
+        const btnConnect = document.getElementById('btnConnect');
+        const btnPushToTalk = document.getElementById('btnPushToTalk');
+        const btnEndGame = document.getElementById('btnEndGame');
+        const statusDiv = document.getElementById('status');
+        const resultsDiv = document.getElementById('results');
+        const audioPlayer = document.getElementById('audioPlayer');
+
+        // --- State ---
+        let sessionId = null;
+        let socket = null;
+        let mediaRecorder = null;
+        let audioQueue = []; // This will collect all the chunks
+
+        // --- Config ---
+        const API_URL = "http://127.0.0.1:8000";
+        const WS_URL = "ws://127.0.0.1:8000";
+        const TEST_SCENARIO_ID = "forgotten_birthday";
+        const TEST_USER_ID = "html_test_user";
+
+        // --- 1. Start Game (REST API) ---
+        btnStartGame.onclick = async () => {
+            updateStatus("Starting game...");
+            console.log("--- 1. STARTING GAME ---");
+            try {
+                const response = await fetch(`${API_URL}/api/v1/game/start/${TEST_SCENARIO_ID}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_id: TEST_USER_ID })
+                });
+
+                console.log("Fetch response received:", response);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                sessionId = data.session_id;
+                console.log("Game started! Session data:", data);
+                updateStatus(`Game created! Session: ${sessionId.substring(0, 8)}...`);
+                btnStartGame.disabled = true;
+                btnConnect.disabled = false;
+            } catch (err) {
+                updateStatus(`Error starting game: ${err.message}`);
+                console.error("Fetch Error:", err);
+            }
+        };
+
+        // --- 2. Connect WebSocket ---
+        btnConnect.onclick = () => {
+            if (!sessionId) {
+                updateStatus("No session ID. Start a game first.");
+                return;
+            }
+
+            updateStatus("Connecting to WebSocket...");
+            const url = `${WS_URL}/api/v1/game/ws/${sessionId}`;
+            console.log("--- 2. CONNECTING TO WEBSOCKET ---");
+            console.log("Connecting to:", url);
+            socket = new WebSocket(url);
+            socket.binaryType = 'blob'; // <-- Good practice
+
+            socket.onopen = () => {
+                console.log("WebSocket onopen event fired.");
+                updateStatus("Connected! AI will speak first.");
+                btnConnect.disabled = true;
+                btnEndGame.disabled = false;
+            };
+
+            socket.onmessage = (event) => {
+                if (typeof event.data === 'string') {
+                    console.log("Received JSON message:", event.data);
+                    handleJsonMessage(JSON.parse(event.data));
+                } else {
+                    console.log("Received audio chunk (blob). Size:", event.data.size);
+                    handleAudioChunk(event.data);
+                }
+            };
+
+            socket.onerror = (err) => {
+                updateStatus(`WebSocket Error: Check console.`);
+                console.error("WebSocket Error:", err);
+            };
+
+            socket.onclose = (event) => {
+                updateStatus(`WebSocket Closed. Code: ${event.code}`);
+                console.log("WebSocket Close Event:", event);
+                enableAll(false);
+            };
+        };
+
+        // --- 3. Handle JSON Messages ---
+        function handleJsonMessage(data) {
+            console.log("Handling JSON:", data);
+            switch (data.status) {
+                case "ai_speaking":
+                    updateStatus("AI is speaking...");
+                    btnPushToTalk.disabled = true;
+                    btnEndGame.disabled = true;
+                    audioQueue = []; // Clear queue for new AI response
+                    break;
+                case "ai_finished_speaking":
+                    updateStatus("Your turn. Hold to speak.");
+                    btnPushToTalk.disabled = false;
+                    btnEndGame.disabled = false;
+                    // --- THIS IS THE FIX ---
+                    playFullAudio(); // Play the combined audio
+                    // --- END FIX ---
+                    break;
+                case "ai_thinking":
+                    updateStatus("AI is thinking...");
+                    btnPushToTalk.disabled = true;
+                    btnEndGame.disabled = true;
+                    break;
+                case "evaluating":
+                    updateStatus("Evaluating your performance...");
+                    btnPushToTalk.disabled = true;
+                    btnEndGame.disabled = true;
+                    break;
+                case "game_over":
+                    updateStatus("Game Over!");
+                    resultsDiv.innerHTML = `
+                        <h3>Final Score: ${data.score}/10</h3>
+                        <p><strong>Justification:</strong> ${data.justification}</p>
+                    `;
+                    
+                    setTimeout(() => socket.close(), 500);
+                    
+
+                    break;
+                case "error":
+                    updateStatus(`Error: ${data.message}`);
+                    break;
+            }
+        }
+
+        // --- 4. Handle Audio (THE FIX) ---
+        function handleAudioChunk(audioChunk) {
+            // Just collect the chunks, don't play them yet
+            audioQueue.push(audioChunk);
+        }
+
+        function playFullAudio() {
+            if (audioQueue.length === 0) {
+                console.log("No audio chunks to play.");
+                return;
+            }
+
+            console.log("Combining audio chunks and playing...");
+            // Combine all collected blobs into one single blob
+            const fullAudioBlob = new Blob(audioQueue, { type: 'audio/wav' });
+            
+            const audioUrl = URL.createObjectURL(fullAudioBlob);
+            
+            audioPlayer.src = audioUrl;
+            audioPlayer.play().catch(e => console.error("Audio play error:", e)); // Added error handling
+
+            // Clear the queue for the next AI turn
+            audioQueue = [];
+        }
+
+        // We don't need the onended listener anymore
+        // audioPlayer.onended = () => ...
+
+        // --- 5. Push-to-Talk ---
+        btnPushToTalk.onmousedown = async () => {
+            if (!socket) return;
+            console.log("--- 3. PUSH-TO-TALK (START) ---");
+            
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                console.log("Microphone access granted.");
+                mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' }); 
+
+                mediaRecorder.ondataavailable = (event) => {
+                    if (event.data.size > 0 && socket.readyState === WebSocket.OPEN) {
+                        console.log("Sending audio chunk. Size:", event.data.size);
+                        socket.send(event.data);
+                    }
+                };
+                
+                mediaRecorder.onstop = () => {
+                    console.log("MediaRecorder stopped. Sending 'stop_speaking' action.");
+                    if (socket.readyState === WebSocket.OPEN) {
+                        sendJson({ action: "stop_speaking" });
+                    }
+                    stream.getTracks().forEach(track => track.stop());
+                };
+                
+                mediaRecorder.start(500); // Send 500ms chunks
+                console.log("MediaRecorder started. Sending 'start_speaking' action.");
+                sendJson({ action: "start_speaking" });
+                updateStatus("Listening... Release to stop.");
+
+            } catch (err) {
+                updateStatus(`Mic error: ${err.message}`);
+                console.error("Microphone Error:", err);
+            }
+        };
+
+        btnPushToTalk.onmouseup = () => {
+            if (mediaRecorder) {
+                console.log("--- 4. PUSH-TO-TALK (STOP) ---");
+                mediaRecorder.stop();
+                updateStatus("AI is thinking...");
+            }
+        };
+
+        // --- 6. End Game ---
+        btnEndGame.onclick = () => {
+            console.log("--- 5. ENDING GAME ---");
+            sendJson({ action: "end_game" });
+        };
+
+        // --- Helper Functions ---
+        function sendJson(data) {
+            if (socket && socket.readyState === WebSocket.OPEN) {
+                console.log("Sending JSON:", data);
+                socket.send(JSON.stringify(data));
+            }
+        }
+
+        function updateStatus(message) {
+            console.log("Status:", message);
+            statusDiv.textContent = message;
+        }
+
+        function enableAll(all = true) {
+            if (all) btnStartGame.disabled = false;
+            btnConnect.disabled = true;
+            btnPushToTalk.disabled = true;
+            btnEndGame.disabled = true;
+        }
+
+    </script>
+</body>
+</html>

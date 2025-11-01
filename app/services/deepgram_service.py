@@ -7,7 +7,6 @@ from app.core.config import settings
 logger = logging.getLogger(__name__)
 
 # --- Voice Models ---
-# We can keep these from your original project, they are great.
 MALE_VOICES = [
     "aura-2-odysseus-en", "aura-2-apollo-en", "aura-2-arcas-en", "aura-2-aries-en",
     "aura-2-atlas-en", "aura-2-draco-en", "aura-2-hermes-en", "aura-2-hyperion-en",
@@ -27,8 +26,7 @@ FEMALE_VOICES = [
 
 class LiveTranscription:
     """
-    Manages a live transcription connection to Deepgram.
-    This is reused directly from your Radio Mirchi project.
+    Manages a live transcription connection to Deepgram (v3 SDK).
     """
     def __init__(self, deepgram_client: DeepgramClient):
         self.client = deepgram_client
@@ -36,30 +34,38 @@ class LiveTranscription:
         self._is_active = False
         self.full_transcript = ""
 
-    async def start(self):
+    def start(self):
+        """Start the live transcription connection. This is SYNCHRONOUS."""
         options = LiveOptions(
             model="nova-2",
             language="en-US",
             smart_format=True,
-            encoding="linear16",
-            sample_rate=16000,
+            encoding="opus"  # Correct encoding for webm
         )
-        self.dg_connection.on(LiveTranscriptionEvents.Transcript, self._on_transcript) # type: ignore
-        self.dg_connection.on(LiveTranscriptionEvents.Error, self._on_error) # type: ignore
+        self.dg_connection.on(LiveTranscriptionEvents.Transcript, self._on_transcript)  # type: ignore
+        self.dg_connection.on(LiveTranscriptionEvents.Error, self._on_error)  # type: ignore
         
         try:
-            if not self.dg_connection.start(options): # type: ignore
+            # .start() is synchronous
+            if not self.dg_connection.start(options):  # type: ignore
                 logger.warning("[LiveTranscription] Failed to start connection.")
-                return
+                return False
             self._is_active = True
-            self.full_transcript = "" # Reset transcript on start
+            self.full_transcript = ""  # Reset transcript on start
             logger.info("[LiveTranscription] Connected to Deepgram for STT.")
+            return True
         except Exception as e:
             logger.error(f"[LiveTranscription] Failed to connect to Deepgram: {e}")
+            return False
 
-    async def send(self, audio_chunk: bytes):
+    def send(self, audio_chunk: bytes):
+        """Send audio data to Deepgram. This is SYNCHRONOUS."""
         if self._is_active:
-            await self.dg_connection.send(audio_chunk) # type: ignore
+            try:
+                # .send() is actually synchronous in Deepgram SDK v3
+                self.dg_connection.send(audio_chunk)  # type: ignore
+            except Exception as e:
+                logger.error(f"[LiveTranscription] Error sending audio: {e}")
 
     def _on_transcript(self, *args, **kwargs):
         result = kwargs.get("result")
@@ -72,17 +78,20 @@ class LiveTranscription:
         error = kwargs.get("error")
         logger.error(f"[LiveTranscription] Deepgram Error: {error}")
 
-    async def stop(self) -> str:
-        """Stops the connection and returns the final accumulated transcript."""
+    def stop(self) -> str:
+        """Stops the connection and returns the final accumulated transcript. This is SYNCHRONOUS."""
         if self._is_active:
             self._is_active = False
-            await self.dg_connection.finish() # type: ignore
-            logger.info("[LiveTranscription] Connection closed.")
+            try:
+                self.dg_connection.finish()  # .finish() is synchronous
+                logger.info("[LiveTranscription] Connection closed.")
+            except Exception as e:
+                logger.error(f"[LiveTranscription] Error closing connection: {e}")
         return self.full_transcript.strip()
 
 class DeepgramService:
     """
-    Service to interact with Deepgram's APIs for TTS and STT.
+    A service to interact with Deepgram's APIs for Text-to-Speech and Speech-to-Text.
     """
     def __init__(self):
         self.client = DeepgramClient(settings.DEEPGRAM_API_KEY)
@@ -90,21 +99,26 @@ class DeepgramService:
         self.tts_url = "https://api.deepgram.com/v1/speak"
 
     async def text_to_speech_stream(self, text: str, gender: str):
-        """
-        Generates streaming TTS audio based on the text and character gender.
-        """
         if gender.lower() == 'male':
             model = random.choice(MALE_VOICES)
         else:
             model = random.choice(FEMALE_VOICES)
 
-        logger.info(f"[DeepgramService] Requesting TTS for: '{text[:50]}...' (model: {model})")
+        logger.info(f"[DeepgramService] Requesting TTS for: '{text[:60]}...' (model: {model})")
 
         headers = {
             "Authorization": f"Token {settings.DEEPGRAM_API_KEY}",
             "Content-Type": "application/json"
         }
-        params = {"model": model, "encoding": "linear16", "sample_rate": 24000}
+        
+        # Correct params for browser-playable audio
+        params = {
+            "model": model,
+            "container": "wav",
+            "encoding": "linear16",
+            "sample_rate": 24000
+        }
+        
         payload = {"text": text}
 
         try:
@@ -114,7 +128,7 @@ class DeepgramService:
                     logger.error(f"[DeepgramService] Error from API: {response.status_code} - {error_body.decode()}")
                     response.raise_for_status()
 
-                logger.info(f"[DeepgramService] Success: {response.status_code}. Streaming audio...")
+                logger.info(f"[DeepgramService] Success: 200. Streaming audio...")
                 async for chunk in response.aiter_bytes():
                     yield chunk
                 logger.info("[DeepgramService] Audio stream finished.")
@@ -123,6 +137,8 @@ class DeepgramService:
             logger.error(f"[DeepgramService] HTTP Request Error: {e}")
         except Exception as e:
             logger.error(f"[DeepgramService] An unexpected error occurred: {e}")
+        finally:
+            logger.info(f"[DeepgramService] TTS function finished for: '{text[:60]}...'")
 
     def get_live_transcriber(self) -> "LiveTranscription":
         """

@@ -2,8 +2,8 @@ fastapi
 uvicorn
 pydantic
 pydantic-settings
-google-generativeai
-deepgram-sdk>=3.0.0
+google-genai
+deepgram-sdk==3.3.2
 motor
 python-multipart
 websockets

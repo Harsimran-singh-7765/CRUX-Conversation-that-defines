@@ -7,25 +7,27 @@ from app.api.v1.api_router import api_router # Import our new master router
 # Get the logger we configured in config.py
 logger = logging.getLogger(__name__)
 
+# THIS IS THE LINE THE ERROR IS MISSING
 app = FastAPI(
     title="Crux Backend",
     description="The backend for the 'Crux' high-stakes conversation simulator.",
     version="0.1.0"
 )
 
-# CORS Middleware for your Next.js frontend
+# We are being very explicit. We are only allowing these origins.
 origins = [
-    "http://localhost",
     "http://localhost:3000",
     "http://127.0.0.1:3000",
+    "http://localhost",
+    "http://127.0.0.1",
 ]
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
-    allow_credentials=True,
-    allow_methods=["*"], # Allows all methods
-    allow_headers=["*"], # Allows all headers
+    allow_credentials=True, # <-- Keep this False
+    allow_methods=["*"], 
+    allow_headers=["*"], 
 )
 
 @app.on_event("startup")

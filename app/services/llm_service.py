@@ -1,5 +1,6 @@
 import logging
 from google import genai
+from google.genai import types
 from pydantic import BaseModel, Field
 from app.core.config import settings
 from app.schemas.game_schemas import GameSession, Scenario, ConversationEntry
@@ -16,15 +17,13 @@ class EvaluationResult(BaseModel):
     justification: str = Field(..., description="The AI's one-sentence justification for the score.")
 
 def _get_genai_client():
-    """Initializes and returns a GenAI client."""
+    """Initializes and returns a GenAI client (from Radio Mirchi stack)."""
     try:
-        genai.configure(api_key=settings.GOOGLE_API_KEY)
-        return genai.GenerativeModel('gemini-1.5-flash')
+        return genai.Client(api_key=settings.GOOGLE_API_KEY)
     except Exception as e:
         logger.error(f"Error configuring GenAI client: {e}")
         raise LLMServiceError(f"Error configuring GenAI client: {e}")
 
-# We create one client for the whole service
 llm_client = _get_genai_client()
 
 def _format_history_for_llm(history: list[ConversationEntry]) -> str:
@@ -37,22 +36,16 @@ def _format_history_for_llm(history: list[ConversationEntry]) -> str:
             transcript += f"User: {entry.message}\n"
     return transcript.strip()
 
-async def get_ai_response(session: GameSession, scenario: Scenario) -> str:
+def get_ai_response(session: GameSession, scenario: Scenario) -> str:
     """
-    Generates the AI character's next response based on the conversation history.
+    Generates the AI character's next response (SYNCHRONOUS).
     """
     logger.info(f"Generating AI response for session: {session.session_id}")
-    
-    # 1. Format the conversation history
     transcript = _format_history_for_llm(session.conversation_history)
     
-    # 2. Create the prompt
     prompt = f"""
     You are a character in a high-stakes conversation.
-    
-    YOUR SECRET PROMPT:
-    "{scenario.character_prompt}"
-    
+    YOUR SECRET PROMPT: "{scenario.character_prompt}"
     CONVERSATION HISTORY:
     {transcript}
     
@@ -62,56 +55,54 @@ async def get_ai_response(session: GameSession, scenario: Scenario) -> str:
     """
     
     try:
-        # 3. Call the Gemini API
-        response = await llm_client.generate_content_async(
-            [prompt],
-            generation_config={"temperature": 0.9} # Make it a bit creative
+        # Use the synchronous client
+        response = llm_client.models.generate_content(
+            model="gemini-1.5-flash", # Using the model you said works
+            contents=[types.Part.from_text(text=prompt)],
+            generation_config=types.GenerateContentConfig(temperature=0.9)
         )
-        
         ai_message = response.text.strip()
         logger.info(f"AI Response generated: {ai_message[:50]}...")
         return ai_message
-        
     except Exception as e:
         logger.error(f"Error during AI response generation: {e}")
         raise LLMServiceError(f"Error generating AI response: {e}")
 
-async def evaluate_conversation(session: GameSession, scenario: Scenario) -> EvaluationResult:
+def evaluate_conversation(session: GameSession, scenario: Scenario) -> EvaluationResult:
     """
-    Evaluates the user's performance for the entire conversation.
+    Evaluates the user's performance (SYNCHRONOUS).
     """
     logger.info(f"Evaluating conversation for session: {session.session_id}")
-    
     transcript = _format_history_for_llm(session.conversation_history)
     
-    # 1. Create the evaluator prompt
     prompt = f"""
     You are a conversation evaluator. Your task is to rate the user's performance.
-    
-    THE USER'S GOAL:
-    "{scenario.description}"
-    
+    THE USER'S GOAL: "{scenario.description}"
     FULL CONVERSATION TRANSCRIPT:
     {transcript}
     
     INSTRUCTIONS:
-    Based on the user's goal and the transcript, rate the user's success on a scale of 1 to 10.
-    Provide a concise, one-sentence justification for the score.
-    You must return *ONLY* a valid JSON object with the keys "score" (int) and "justification" (str).
+    Rate the user's success from 1-10.
+    Provide a one-sentence justification.
+    You must return *ONLY* a valid JSON object with keys "score" (int) and "justification" (str).
     """
     
     try:
-        # 2. Call the Gemini API with JSON mode
-        response = await llm_client.generate_content_async(
-            [prompt],
-            generation_config={"response_mime_type": "application/json"}
+        # Configure for JSON response, just like "Radio Mirchi"
+        generate_content_config = types.GenerateContentConfig(
+            response_mime_type="application/json",
+            response_schema=EvaluationResult,
+        )
+        response = llm_client.models.generate_content(
+            model="gemini-1.5-flash",
+            contents=[types.Part.from_text(text=prompt)],
+            config=generate_content_config,
         )
         
-        # 3. Parse and validate the response
-        result = EvaluationResult.model_validate_json(response.text)
-        logger.info(f"Evaluation complete. Score: {result.score}")
-        return result
-        
+        if hasattr(response, 'parsed') and isinstance(response.parsed, EvaluationResult):
+            logger.info(f"Evaluation complete. Score: {response.parsed.score}")
+            return response.parsed
+        raise LLMServiceError("LLM did not return a valid EvaluationResult object.")
     except Exception as e:
         logger.error(f"Error during conversation evaluation: {e}")
         raise LLMServiceError(f"Error evaluating conversation: {e}")
