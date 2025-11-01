@@ -31,6 +31,74 @@
             color: #D9534F;
             margin-top: 0;
         }
+        
+        /* Scenario Generator Section */
+        #generatorSection {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            text-align: left;
+        }
+        #generatorSection h3 {
+            margin-top: 0;
+            color: #5CB85C;
+        }
+        #descriptionInput {
+            width: 100%;
+            padding: 0.8rem;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            font-size: 1rem;
+            margin-bottom: 0.5rem;
+            box-sizing: border-box;
+            resize: vertical;
+            min-height: 80px;
+        }
+        #charCount {
+            font-size: 0.85rem;
+            color: #666;
+            margin-bottom: 0.8rem;
+        }
+        #charCount.warning {
+            color: #f0ad4e;
+        }
+        #charCount.error {
+            color: #D9534F;
+        }
+        .generator-buttons {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+        #btnGenerate {
+            background-color: #5CB85C;
+            color: white;
+            flex: 1;
+            min-width: 150px;
+        }
+        #btnGenerate:disabled {
+            background-color: #ccc;
+        }
+        .example-chips {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+            margin-bottom: 1rem;
+        }
+        .example-chip {
+            background: #e0e0e0;
+            padding: 0.4rem 0.8rem;
+            border-radius: 16px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .example-chip:hover {
+            background: #5BC0DE;
+            color: white;
+        }
+        
         #status {
             font-size: 1.2rem;
             font-weight: bold;
@@ -56,6 +124,37 @@
             0% { transform: scale(1); }
             50% { transform: scale(1.05); }
             100% { transform: scale(1); }
+        }
+
+        /* Scenario Selection */
+        .scenario-selector {
+            margin-bottom: 1rem;
+        }
+        .scenario-header {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+        #scenarioSelect {
+            flex: 1;
+            padding: 0.5rem;
+            font-size: 1rem;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+        }
+        #btnRefreshScenarios {
+            background-color: #5BC0DE;
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            border: none;
+            cursor: pointer;
+            font-size: 0.9rem;
+        }
+        #btnRefreshScenarios:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
         }
 
         #chatLog {
@@ -90,7 +189,6 @@
             border-bottom-left-radius: 0;
         }
         
-        /* SPAM EFFECT */
         .message.ai.spam {
             background-color: #ff6b6b;
             color: white;
@@ -176,6 +274,19 @@
             margin-top: 1.5rem;
             font-size: 1.1rem;
         }
+        
+        .loading {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s ease-in-out infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
     </style>
 </head>
 <body>
@@ -183,20 +294,41 @@
     <div class="container">
         <h1>Crux Test Client 🎙️</h1>
         
-        <div style="margin-bottom: 1rem;">
-            <label for="scenarioSelect" style="display: block; margin-bottom: 0.5rem; font-weight: bold;">
+        <!-- Scenario Generator Section -->
+        <div id="generatorSection">
+            <h3>✨ Create Custom Scenario</h3>
+            <textarea 
+                id="descriptionInput" 
+                placeholder="Describe a difficult conversation situation... (10-500 characters)&#10;&#10;Examples:&#10;• My mom caught me coming home at 3 AM&#10;• Boss is angry about missed deadline&#10;• Roommate keeps eating my food"
+                maxlength="500"
+            ></textarea>
+            <div id="charCount">0 / 500 characters</div>
+            
+            <div class="example-chips">
+                <div class="example-chip" data-example="My mom caught me sneaking in at 3 AM smelling of alcohol">🏠 Late Night</div>
+                <div class="example-chip" data-example="My boss is furious I missed an important client deadline">💼 Missed Deadline</div>
+                <div class="example-chip" data-example="My roommate keeps eating my food without asking">🍕 Food Thief</div>
+                <div class="example-chip" data-example="A taxi driver is taking a suspicious route late at night">🚕 Sketchy Taxi</div>
+            </div>
+            
+            <div class="generator-buttons">
+                <button id="btnGenerate" disabled>
+                    🤖 Generate Scenario with AI
+                </button>
+            </div>
+        </div>
+        
+        <!-- Scenario Selection -->
+        <div class="scenario-selector">
+            <label style="display: block; margin-bottom: 0.5rem; font-weight: bold;">
                 Choose Scenario:
             </label>
-            <select id="scenarioSelect" style="width: 100%; padding: 0.5rem; font-size: 1rem; border-radius: 4px; border: 1px solid #ddd;">
-                <option value="drunk_driving_incident">🚔 Caught Drunk Driving</option>
-                <option value="forgotten_birthday" selected>🎂 The Forgotten Birthday</option>
-                <option value="apologetic_boyfriend">💔 The Makeup Call</option>
-                <option value="creepy_freshman">😨 The Persistent Freshman</option>
-                <option value="sketchy_taxi_driver">🚕 The Late Night Taxi</option>
-                <option value="annoying_roommate">🏠 The Messy Roommate</option>
-                <option value="suspicious_job_interview">💼 The Sketchy Job Interview</option>
-                <option value="toxic_friend_guilt_trip">🎭 The Guilt-Tripping Friend</option>
-            </select>
+            <div class="scenario-header">
+                <select id="scenarioSelect">
+                    <option value="">Loading scenarios...</option>
+                </select>
+                <button id="btnRefreshScenarios" title="Refresh scenario list">🔄</button>
+            </div>
         </div>
         
         <button id="btnStartGame">1. Start New Game</button>
@@ -221,12 +353,17 @@
         const btnConnect = document.getElementById('btnConnect');
         const btnPushToTalk = document.getElementById('btnPushToTalk');
         const btnEndGame = document.getElementById('btnEndGame');
+        const btnGenerate = document.getElementById('btnGenerate');
+        const btnRefreshScenarios = document.getElementById('btnRefreshScenarios');
         const statusDiv = document.getElementById('status');
         const resultsDiv = document.getElementById('results');
         const audioPlayer = document.getElementById('audioPlayer');
         const chatLog = document.getElementById('chatLog');
         const timerDiv = document.getElementById('timer');
         const scenarioSelect = document.getElementById('scenarioSelect');
+        const descriptionInput = document.getElementById('descriptionInput');
+        const charCount = document.getElementById('charCount');
+        const exampleChips = document.querySelectorAll('.example-chip');
 
         // --- State ---
         let sessionId = null;
@@ -237,9 +374,7 @@
         let timeLeft = 120;
         let typingIndicator = null;
         let pendingAIMessage = '';
-        let isTimerPaused = false; // NEW: Track if timer is paused
-        
-        // SPAM STREAK STATE
+        let isTimerPaused = false;
         let isSpamMode = false;
         let spamQueue = [];
 
@@ -248,14 +383,123 @@
         const WS_URL = "ws://127.0.0.1:8000";
         const TEST_USER_ID = "html_test_user";
         
-        // Get selected scenario ID
+        // --- Initialize ---
+        loadScenarios();
+        
+        // --- Scenario Generator ---
+        descriptionInput.addEventListener('input', () => {
+            const length = descriptionInput.value.length;
+            charCount.textContent = `${length} / 500 characters`;
+            
+            if (length < 10) {
+                charCount.classList.remove('warning', 'error');
+                btnGenerate.disabled = true;
+            } else if (length > 450) {
+                charCount.classList.add('warning');
+                charCount.classList.remove('error');
+                btnGenerate.disabled = false;
+            } else {
+                charCount.classList.remove('warning', 'error');
+                btnGenerate.disabled = false;
+            }
+        });
+        
+        exampleChips.forEach(chip => {
+            chip.addEventListener('click', () => {
+                descriptionInput.value = chip.dataset.example;
+                descriptionInput.dispatchEvent(new Event('input'));
+            });
+        });
+        
+        btnGenerate.onclick = async () => {
+            const description = descriptionInput.value.trim();
+            if (description.length < 10 || description.length > 500) {
+                updateStatus("Description must be 10-500 characters");
+                return;
+            }
+            
+            btnGenerate.disabled = true;
+            btnGenerate.innerHTML = '<span class="loading"></span> Generating...';
+            updateStatus("🤖 AI is creating your scenario...");
+            
+            try {
+                const response = await fetch(`${API_URL}/api/v1/scenarios/generate`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ description })
+                });
+                
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Failed to generate scenario');
+                }
+                
+                const data = await response.json();
+                updateStatus(`✅ Created: ${data.scenario.title}`);
+                
+                // Clear input
+                descriptionInput.value = '';
+                charCount.textContent = '0 / 500 characters';
+                
+                // Reload scenarios and select the new one
+                await loadScenarios();
+                scenarioSelect.value = data.scenario.id;
+                
+            } catch (err) {
+                updateStatus(`❌ Error: ${err.message}`);
+                console.error("Generation Error:", err);
+            } finally {
+                btnGenerate.disabled = false;
+                btnGenerate.textContent = '🤖 Generate Scenario with AI';
+            }
+        };
+        
+        btnRefreshScenarios.onclick = async () => {
+            await loadScenarios();
+        };
+        
+        async function loadScenarios() {
+            btnRefreshScenarios.disabled = true;
+            try {
+                const response = await fetch(`${API_URL}/api/v1/scenarios/`);
+                if (!response.ok) throw new Error('Failed to load scenarios');
+                
+                const scenarios = await response.json();
+                
+                scenarioSelect.innerHTML = '';
+                scenarios.forEach(scenario => {
+                    const option = document.createElement('option');
+                    option.value = scenario.id;
+                    option.textContent = scenario.title;
+                    scenarioSelect.appendChild(option);
+                });
+                
+                if (scenarios.length === 0) {
+                    const option = document.createElement('option');
+                    option.textContent = 'No scenarios available';
+                    scenarioSelect.appendChild(option);
+                }
+                
+            } catch (err) {
+                console.error("Error loading scenarios:", err);
+                scenarioSelect.innerHTML = '<option>Error loading scenarios</option>';
+            } finally {
+                btnRefreshScenarios.disabled = false;
+            }
+        }
+        
         function getSelectedScenarioId() {
             return scenarioSelect.value;
         }
 
-        // --- 1. Start Game (REST API) ---
+        // --- 1. Start Game ---
         btnStartGame.onclick = async () => {
             const scenarioId = getSelectedScenarioId();
+            if (!scenarioId) {
+                updateStatus("Please select a scenario first");
+                return;
+            }
+            
             const scenarioTitle = scenarioSelect.options[scenarioSelect.selectedIndex].text;
             
             updateStatus("Starting game...");
@@ -275,6 +519,9 @@
                 btnStartGame.disabled = true;
                 btnConnect.disabled = false;
                 scenarioSelect.disabled = true;
+                btnRefreshScenarios.disabled = true;
+                descriptionInput.disabled = true;
+                btnGenerate.disabled = true;
                 pendingAIMessage = data.conversation_history[0].message;
             } catch (err) {
                 updateStatus(`Error starting game: ${err.message}`);
@@ -395,10 +642,8 @@
                     break;
                     
                 case "ai_response_text":
-                    // Check if this is a spam response (contains BREAK)
                     if (data.text && data.text.includes("BREAK")) {
                         console.log("🔥 Spam response detected, skipping normal display");
-                        // Don't store it - spam messages will be shown individually
                     } else if (!isSpamMode) {
                         pendingAIMessage = data.text;
                     }
@@ -413,7 +658,6 @@
         // --- 4. Handle Audio ---
         function handleAudioChunk(audioChunk) {
             if (isSpamMode && spamQueue.length > 0) {
-                // Assign audio to the last spam message that doesn't have audio yet
                 for (let i = 0; i < spamQueue.length; i++) {
                     if (!spamQueue[i].audio) {
                         spamQueue[i].audio = audioChunk;
@@ -435,7 +679,7 @@
             
             audioPlayer.onplay = () => {
                 hideTypingIndicator();
-                pauseTimer(); // Pause timer when audio starts
+                pauseTimer();
                 if (pendingAIMessage) {
                     addMessageToChat('ai', pendingAIMessage);
                     pendingAIMessage = '';
@@ -443,32 +687,27 @@
             };
             
             audioPlayer.onended = () => {
-                resumeTimer(); // Resume timer when audio ends
+                resumeTimer();
             };
             
             audioPlayer.play().catch(e => console.error("Audio play error:", e));
             audioQueue = [];
         }
         
-        // --- SPAM STREAK PLAYER ---
         async function playSpamStreak() {
             console.log(`Playing spam streak with ${spamQueue.length} messages`);
             hideTypingIndicator();
-            pauseTimer(); // Pause timer for entire spam streak
+            pauseTimer();
             
             for (let i = 0; i < spamQueue.length; i++) {
                 const spam = spamQueue[i];
-                
-                // Add message to chat with spam styling
                 addMessageToChat('ai', spam.text, true);
                 
-                // Play audio if available
                 if (spam.audio) {
                     const audioBlob = new Blob([spam.audio], { type: 'audio/wav' });
                     const audioUrl = URL.createObjectURL(audioBlob);
                     audioPlayer.src = audioUrl;
                     
-                    // Wait for this audio to finish before next message
                     await new Promise((resolve) => {
                         audioPlayer.onended = resolve;
                         audioPlayer.play().catch(e => {
@@ -477,15 +716,13 @@
                         });
                     });
                     
-                    // Small delay between spam messages for effect
                     await new Promise(r => setTimeout(r, 200));
                 }
             }
             
-            // Reset spam mode
             isSpamMode = false;
             spamQueue = [];
-            resumeTimer(); // Resume timer after spam streak ends
+            resumeTimer();
             updateStatus("Your turn. Hold to speak.");
             btnPushToTalk.disabled = false;
             btnEndGame.disabled = false;
@@ -528,12 +765,12 @@
             }
         };
 
-        // --- 6. End Game Button ---
+        // --- 6. End Game ---
         btnEndGame.onclick = () => {
             endGame();
         };
 
-        // --- 7. Timer Functions ---
+        // --- 7. Timer ---
         function startTimer() {
             timeLeft = 120;
             isTimerPaused = false;
@@ -541,7 +778,7 @@
             stopTimer();
 
             timerInterval = setInterval(() => {
-                if (!isTimerPaused) { // Only decrement if not paused
+                if (!isTimerPaused) {
                     timeLeft--;
                     updateTimerDisplay();
                     
@@ -585,7 +822,6 @@
             timerDiv.textContent = `Time left: ${minutes}:${seconds.toString().padStart(2, '0')}${pauseIndicator}`;
         }
         
-        // --- 8. End Game Function ---
         function endGame(isAutoEnd = false) {
             if (isAutoEnd) {
                 updateStatus("Time's up! Evaluating...");
@@ -597,7 +833,7 @@
             btnEndGame.disabled = true;
         }
 
-        // --- 9. Chat Log Function ---
+        // --- 8. Chat ---
         function addMessageToChat(role, text, isSpam = false) {
             const msgDiv = document.createElement('div');
             msgDiv.classList.add('message', role);
@@ -609,7 +845,6 @@
             chatLog.scrollTop = chatLog.scrollHeight;
         }
         
-        // --- 10. Typing Indicator Functions ---
         function showTypingIndicator() {
             hideTypingIndicator();
             typingIndicator = document.createElement('div');
@@ -626,7 +861,7 @@
             }
         }
 
-        // --- Helper Functions ---
+        // --- Helpers ---
         function sendJson(data) {
             if (socket && socket.readyState === WebSocket.OPEN) {
                 console.log("Sending JSON:", data);
@@ -643,6 +878,9 @@
             if (all) {
                 btnStartGame.disabled = false;
                 scenarioSelect.disabled = false;
+                btnRefreshScenarios.disabled = false;
+                descriptionInput.disabled = false;
+                btnGenerate.disabled = descriptionInput.value.length < 10;
             }
             btnConnect.disabled = true;
             btnPushToTalk.disabled = true;
