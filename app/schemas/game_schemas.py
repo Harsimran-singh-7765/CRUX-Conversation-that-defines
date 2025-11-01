@@ -11,6 +11,8 @@ class Scenario(BaseModel):
     title: str = Field(..., description="The main title of the scenario")
     description: str = Field(..., description="A brief description for the user")
     character_name: str = Field(..., description="The name of the AI character (e.g., 'Officer Miller')")
+    # --- ADDED THIS LINE ---
+    character_gender: str = Field(..., description="The character's gender ('male' or 'female') for voice selection")
     character_prompt: str = Field(..., description="The secret, detailed prompt for the LLM that defines its personality and goal")
     initial_dialogue: str = Field(..., description="The very first line the AI will say to start the conversation")
 

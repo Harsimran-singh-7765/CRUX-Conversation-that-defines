@@ -1,6 +1,5 @@
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
-# We will create app.core.config next
-from app.core.config import settings 
+from app.core.config import settings # This settings object now has MONGODB_DB
 
 class DataBase:
     client: AsyncIOMotorClient | None = None
@@ -15,11 +14,10 @@ async def get_database() -> AsyncIOMotorDatabase:
     if db.client is None:
         raise Exception("Database client not initialized. Ensure `connect_to_mongo` is called on application startup.")
     
-    # This line gets the database name directly from your .env
-    # We will make sure 'settings.MONGODB_DB' is defined in config.py
-    # This assumes your MONGODB_URI already specifies the db name 'crux_db'
-    # Let's adjust this to be simpler.
-    return db.client.get_default_database()
+    # --- THIS IS THE FIX ---
+    # Instead of relying on a "default", we explicitly get the database
+    # by its name from our settings. This is far more reliable.
+    return db.client[settings.MONGODB_DB]
 
 
 async def connect_to_mongo():
@@ -28,7 +26,7 @@ async def connect_to_mongo():
         settings.MONGODB_URI,
         uuidRepresentation='standard'
     )
-    print("Connected to MongoDB Atlas...")
+    print(f"Connected to MongoDB Atlas... (Database: {settings.MONGODB_DB})") # Added a log
 
 async def close_mongo_connection():
     """Closes the MongoDB database connection."""
