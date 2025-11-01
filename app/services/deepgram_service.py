@@ -35,37 +35,30 @@ class LiveTranscription:
         self.full_transcript = ""
 
     def start(self):
-        """Start the live transcription connection. This is SYNCHRONOUS."""
         options = LiveOptions(
             model="nova-2",
             language="en-US",
             smart_format=True,
-            encoding="opus"  # Correct encoding for webm
+            encoding="opus" # Correct encoding for webm
         )
-        self.dg_connection.on(LiveTranscriptionEvents.Transcript, self._on_transcript)  # type: ignore
-        self.dg_connection.on(LiveTranscriptionEvents.Error, self._on_error)  # type: ignore
+        self.dg_connection.on(LiveTranscriptionEvents.Transcript, self._on_transcript) # type: ignore
+        self.dg_connection.on(LiveTranscriptionEvents.Error, self._on_error) # type: ignore
         
         try:
-            # .start() is synchronous
-            if not self.dg_connection.start(options):  # type: ignore
+            if not self.dg_connection.start(options): # type: ignore
                 logger.warning("[LiveTranscription] Failed to start connection.")
-                return False
+                return
             self._is_active = True
-            self.full_transcript = ""  # Reset transcript on start
+            self.full_transcript = "" # Reset transcript on start
             logger.info("[LiveTranscription] Connected to Deepgram for STT.")
-            return True
         except Exception as e:
             logger.error(f"[LiveTranscription] Failed to connect to Deepgram: {e}")
-            return False
 
+    # --- FIX: This function is SYNCHRONOUS ---
     def send(self, audio_chunk: bytes):
-        """Send audio data to Deepgram. This is SYNCHRONOUS."""
         if self._is_active:
-            try:
-                # .send() is actually synchronous in Deepgram SDK v3
-                self.dg_connection.send(audio_chunk)  # type: ignore
-            except Exception as e:
-                logger.error(f"[LiveTranscription] Error sending audio: {e}")
+            self.dg_connection.send(audio_chunk) # type: ignore
+    # --- END FIX ---
 
     def _on_transcript(self, *args, **kwargs):
         result = kwargs.get("result")
@@ -79,14 +72,11 @@ class LiveTranscription:
         logger.error(f"[LiveTranscription] Deepgram Error: {error}")
 
     def stop(self) -> str:
-        """Stops the connection and returns the final accumulated transcript. This is SYNCHRONOUS."""
+        """Stops the connection and returns the final accumulated transcript."""
         if self._is_active:
             self._is_active = False
-            try:
-                self.dg_connection.finish()  # .finish() is synchronous
-                logger.info("[LiveTranscription] Connection closed.")
-            except Exception as e:
-                logger.error(f"[LiveTranscription] Error closing connection: {e}")
+            self.dg_connection.finish() # .finish() is synchronous
+            logger.info("[LiveTranscription] Connection closed.")
         return self.full_transcript.strip()
 
 class DeepgramService:

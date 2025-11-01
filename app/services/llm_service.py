@@ -55,18 +55,23 @@ def get_ai_response(session: GameSession, scenario: Scenario) -> str:
     """
     
     try:
-        # Use the synchronous client
+        model_name = "gemini-2.0-flash" # The model that worked in your test
+
+        config = types.GenerateContentConfig(temperature=0.9)
         response = llm_client.models.generate_content(
-            model="gemini-1.5-flash", # Using the model you said works
-            contents=[types.Part.from_text(text=prompt)],
-            generation_config=types.GenerateContentConfig(temperature=0.9)
+            model=model_name,
+            # --- THIS IS THE FIX ---
+            # Pass the prompt string directly, as per the documentation
+            contents=prompt,
+            # --- END FIX ---
+            config=config 
         )
         ai_message = response.text.strip()
         logger.info(f"AI Response generated: {ai_message[:50]}...")
         return ai_message
     except Exception as e:
         logger.error(f"Error during AI response generation: {e}")
-        raise LLMServiceError(f"Error generating AI response: {e}")
+        raise LLMServiceError(f"AI Response Failure: {e}")
 
 def evaluate_conversation(session: GameSession, scenario: Scenario) -> EvaluationResult:
     """
@@ -88,21 +93,32 @@ def evaluate_conversation(session: GameSession, scenario: Scenario) -> Evaluatio
     """
     
     try:
-        # Configure for JSON response, just like "Radio Mirchi"
-        generate_content_config = types.GenerateContentConfig(
+        model_name = "gemini-2.0-flash" # The model that worked in your test
+
+        config = types.GenerateContentConfig(
             response_mime_type="application/json",
             response_schema=EvaluationResult,
         )
         response = llm_client.models.generate_content(
-            model="gemini-1.5-flash",
-            contents=[types.Part.from_text(text=prompt)],
-            config=generate_content_config,
+            model=model_name,
+            # --- THIS IS THE FIX ---
+            # Pass the prompt string directly, as per the documentation
+            contents=prompt,
+            # --- END FIX ---
+            config=config
         )
         
         if hasattr(response, 'parsed') and isinstance(response.parsed, EvaluationResult):
             logger.info(f"Evaluation complete. Score: {response.parsed.score}")
             return response.parsed
-        raise LLMServiceError("LLM did not return a valid EvaluationResult object.")
+        
+        # Fallback if .parsed doesn't work
+        logger.warning("LLM did not return a parsed object. Attempting manual JSON parse.")
+        clean_json_str = response.text.strip().lstrip("```json").rstrip("```")
+        result = EvaluationResult.model_validate_json(clean_json_str)
+        logger.info(f"Evaluation complete (manual parse). Score: {result.score}")
+        return result
+        
     except Exception as e:
         logger.error(f"Error during conversation evaluation: {e}")
-        raise LLMServiceError(f"Error evaluating conversation: {e}")
+        raise LLMServiceError(f"Evaluation Failure: {e}")

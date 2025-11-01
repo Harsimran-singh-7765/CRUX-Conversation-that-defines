@@ -65,16 +65,13 @@ class GameSessionManager:
         """Start Deepgram real-time transcription."""
         logger.info(f"[{self.session_id}] Starting STT...")
         self.transcriber = deepgram_service.get_live_transcriber()
-
-        # start() is synchronous, just call it
-        if hasattr(self.transcriber, "start"):
-            self.transcriber.start()
+        self.transcriber.start() # This is synchronous
 
     async def _handle_user_speech(self, audio_chunk: bytes):
         """Send audio data to the transcriber."""
-        if self.transcriber and hasattr(self.transcriber, "send"):
-            # send() is synchronous in Deepgram SDK
-            self.transcriber.send(audio_chunk)
+        if self.transcriber and self.transcriber._is_active:
+            # .send() is synchronous, so we run it in a thread
+            await asyncio.to_thread(self.transcriber.send, audio_chunk)
 
     async def _stop_stt_and_process_transcript(self):
         """Stop STT and process the final transcript."""
@@ -82,54 +79,53 @@ class GameSessionManager:
             return
 
         logger.info(f"[{self.session_id}] Stopping STT...")
+        
+        transcript = self.transcriber.stop() # This is synchronous
+        self.transcriber = None
 
-        try:
-            # stop() is synchronous and returns the transcript string
-            transcript = self.transcriber.stop()
-            self.transcriber = None
-
-            # Only process if we got a valid transcript string
-            if transcript and isinstance(transcript, str) and transcript.strip():
-                await self._process_user_transcript(transcript)
-            else:
-                logger.warning(f"[{self.session_id}] Empty or invalid transcript: {transcript}")
-                await self._send_json({"status": "ai_finished_speaking"})
-                
-        except Exception as e:
-            logger.error(f"[{self.session_id}] Error stopping STT: {e}", exc_info=True)
-            self.transcriber = None
-            await self._send_json({"status": "error", "message": "Speech recognition failed"})
+        if transcript and isinstance(transcript, str) and transcript.strip():
+            await self._process_user_transcript(transcript)
+        else:
+            logger.warning(f"[{self.session_id}] Empty or invalid transcript.")
+            await self._send_json({"status": "ai_finished_speaking"})
 
     async def _process_user_transcript(self, text: str):
         if not self.session or not self.scenario:
-            logger.error(f"[{self.session_id}] Error: _process_user_transcript called with no session or scenario.")
-            return
-
+             logger.error(f"[{self.session_id}] Error: _process_user_transcript called with no session or scenario.")
+             return
+             
         logger.info(f"[{self.session_id}] User said: '{text}'")
 
         self.session.conversation_history.append(ConversationEntry(role="user", message=text))
         await self._send_json({"status": "ai_thinking"})
 
         try:
-            response = await llm_service.get_ai_response(self.session, self.scenario)
+            # Run the SYNCHRONOUS llm_service function in a separate thread
+            response = await asyncio.to_thread(
+                llm_service.get_ai_response, self.session, self.scenario
+            )
             self.session.conversation_history.append(ConversationEntry(role="ai", message=response))
             await self._stream_ai_audio(response, self.scenario.character_gender)
 
         except Exception as e:
-            logger.error(f"[{self.session_id}] AI response error: {e}")
+            logger.error(f"[{self.session_id}] AI response error: {e}", exc_info=True)
+            # This is the line that was cut off
             await self._send_json({"status": "error", "message": "AI processing failed"})
 
     async def _handle_end_game(self):
         if not self.session or not self.scenario:
-            logger.error(f"[{self.session_id}] Error: _handle_end_game called with no session or scenario.")
-            return
+             logger.error(f"[{self.session_id}] Error: _handle_end_game called with no session or scenario.")
+             return
 
         logger.info(f"[{self.session_id}] User ended the game.")
 
         await self._send_json({"status": "evaluating"})
 
         try:
-            result = await llm_service.evaluate_conversation(self.session, self.scenario)
+            # Run the SYNCHRONOUS llm_service function in a separate thread
+            result = await asyncio.to_thread(
+                llm_service.evaluate_conversation, self.session, self.scenario
+            )
             await db_service.db_end_game_session(
                 session_id=self.session.session_id,
                 score=result.score,
@@ -142,7 +138,7 @@ class GameSessionManager:
             })
 
         except Exception as e:
-            logger.error(f"[{self.session_id}] Evaluation error: {e}")
+            logger.error(f"[{self.session_id}] Evaluation error: {e}", exc_info=True)
             await self._send_json({"status": "error", "message": "Game result failed"})
         finally:
             self.is_active = False
@@ -191,8 +187,7 @@ class GameSessionManager:
         if self.transcriber:
             try:
                 if hasattr(self.transcriber, '_is_active') and self.transcriber._is_active:
-                    # stop() is synchronous
-                    self.transcriber.stop()
+                    self.transcriber.stop() # This is synchronous
             except Exception as e:
                 logger.error(f"[{self.session_id}] Error during cleanup: {e}")
             finally:
