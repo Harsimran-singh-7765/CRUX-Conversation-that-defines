@@ -7,7 +7,7 @@
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background-color: #FFFDEB; /* Pastel Yellow */
+            background-color: #FFFDEB;
             color: #333;
             display: flex;
             flex-direction: column;
@@ -28,29 +28,28 @@
             text-align: center;
         }
         h1 {
-            color: #D9534F; /* Pastel Red */
+            color: #D9534F;
             margin-top: 0;
         }
         #status {
             font-size: 1.2rem;
             font-weight: bold;
-            color: #5BC0DE; /* Pastel Blue */
-            margin: 1rem 0; /* Reduced margin */
+            color: #5BC0DE;
+            margin: 1rem 0;
             padding: 1rem;
             background: #f0f8ff;
             border-radius: 8px;
             min-height: 2rem;
         }
         
-        /* --- TIMER STYLE --- */
         #timer {
             font-size: 1.5rem;
             font-weight: bold;
-            color: #5CB85C; /* Pastel Green */
+            color: #5CB85C;
             margin-bottom: 1rem;
         }
         #timer.low {
-            color: #D9534F; /* Pastel Red */
+            color: #D9534F;
             animation: pulse 1s infinite;
         }
         @keyframes pulse {
@@ -58,7 +57,6 @@
             50% { transform: scale(1.05); }
             100% { transform: scale(1); }
         }
-        /* --- END TIMER STYLE --- */
 
         #chatLog {
             width: 100%;
@@ -80,7 +78,7 @@
             word-wrap: break-word;
         }
         .message.user {
-            background-color: #5BC0DE; /* Pastel Blue */
+            background-color: #5BC0DE;
             color: white;
             margin-left: auto;
             border-bottom-right-radius: 0;
@@ -92,7 +90,27 @@
             border-bottom-left-radius: 0;
         }
         
-        /* --- TYPING INDICATOR --- */
+        /* SPAM EFFECT */
+        .message.ai.spam {
+            background-color: #ff6b6b;
+            color: white;
+            animation: spamPop 0.3s ease-out;
+            font-weight: bold;
+        }
+        @keyframes spamPop {
+            0% { 
+                transform: scale(0.8) translateX(-20px);
+                opacity: 0;
+            }
+            50% {
+                transform: scale(1.1);
+            }
+            100% { 
+                transform: scale(1) translateX(0);
+                opacity: 1;
+            }
+        }
+        
         .typing-indicator {
             display: flex;
             align-items: center;
@@ -121,7 +139,6 @@
             0%, 60%, 100% { transform: translateY(0); }
             30% { transform: translateY(-10px); }
         }
-        /* --- END TYPING INDICATOR --- */
         
         button {
             font-size: 1rem;
@@ -137,22 +154,22 @@
             opacity: 0.6;
         }
         #btnStartGame, #btnConnect {
-            background-color: #5CB85C; /* Pastel Green */
+            background-color: #5CB85C;
             color: white;
         }
         #btnPushToTalk {
-            background-color: #5BC0DE; /* Pastel Blue */
+            background-color: #5BC0DE;
             color: white;
             width: 80%;
             padding: 1rem;
             font-size: 1.2rem;
         }
         #btnPushToTalk:active:not(:disabled) {
-            background-color: #D9534F; /* Pastel Red */
+            background-color: #D9534F;
             transform: scale(0.98);
         }
         #btnEndGame {
-            background-color: #f0ad4e; /* Pastel Orange */
+            background-color: #f0ad4e;
             color: white;
         }
         #results {
@@ -166,7 +183,23 @@
     <div class="container">
         <h1>Crux Test Client 🎙️</h1>
         
-        <button id="btnStartGame">1. Start New Game (Forgotten Birthday)</button>
+        <div style="margin-bottom: 1rem;">
+            <label for="scenarioSelect" style="display: block; margin-bottom: 0.5rem; font-weight: bold;">
+                Choose Scenario:
+            </label>
+            <select id="scenarioSelect" style="width: 100%; padding: 0.5rem; font-size: 1rem; border-radius: 4px; border: 1px solid #ddd;">
+                <option value="drunk_driving_incident">🚔 Caught Drunk Driving</option>
+                <option value="forgotten_birthday" selected>🎂 The Forgotten Birthday</option>
+                <option value="apologetic_boyfriend">💔 The Makeup Call</option>
+                <option value="creepy_freshman">😨 The Persistent Freshman</option>
+                <option value="sketchy_taxi_driver">🚕 The Late Night Taxi</option>
+                <option value="annoying_roommate">🏠 The Messy Roommate</option>
+                <option value="suspicious_job_interview">💼 The Sketchy Job Interview</option>
+                <option value="toxic_friend_guilt_trip">🎭 The Guilt-Tripping Friend</option>
+            </select>
+        </div>
+        
+        <button id="btnStartGame">1. Start New Game</button>
         <button id="btnConnect" disabled>2. Connect WebSocket</button>
 
         <div id="timer">Time left: 2:00</div>
@@ -180,7 +213,7 @@
         <div id="results"></div>
     </div>
 
-    <audio id="audioPlayer" autoplay></audio>
+    <audio id="audioPlayer"></audio>
 
     <script>
         // --- DOM Elements ---
@@ -193,6 +226,7 @@
         const audioPlayer = document.getElementById('audioPlayer');
         const chatLog = document.getElementById('chatLog');
         const timerDiv = document.getElementById('timer');
+        const scenarioSelect = document.getElementById('scenarioSelect');
 
         // --- State ---
         let sessionId = null;
@@ -203,21 +237,33 @@
         let timeLeft = 120;
         let typingIndicator = null;
         let pendingAIMessage = '';
+        let isTimerPaused = false; // NEW: Track if timer is paused
+        
+        // SPAM STREAK STATE
+        let isSpamMode = false;
+        let spamQueue = [];
 
         // --- Config ---
         const API_URL = "http://127.0.0.1:8000";
         const WS_URL = "ws://127.0.0.1:8000";
-        const TEST_SCENARIO_ID = "forgotten_birthday";
         const TEST_USER_ID = "html_test_user";
+        
+        // Get selected scenario ID
+        function getSelectedScenarioId() {
+            return scenarioSelect.value;
+        }
 
         // --- 1. Start Game (REST API) ---
         btnStartGame.onclick = async () => {
+            const scenarioId = getSelectedScenarioId();
+            const scenarioTitle = scenarioSelect.options[scenarioSelect.selectedIndex].text;
+            
             updateStatus("Starting game...");
             chatLog.innerHTML = "";
             resultsDiv.innerHTML = "";
             updateTimerDisplay();
             try {
-                const response = await fetch(`${API_URL}/api/v1/game/start/${TEST_SCENARIO_ID}`, {
+                const response = await fetch(`${API_URL}/api/v1/game/start/${scenarioId}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ user_id: TEST_USER_ID })
@@ -225,10 +271,10 @@
                 if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
                 const data = await response.json();
                 sessionId = data.session_id;
-                updateStatus(`Game created! Session: ${sessionId.substring(0, 8)}...`);
+                updateStatus(`Game created! Scenario: ${scenarioTitle}`);
                 btnStartGame.disabled = true;
                 btnConnect.disabled = false;
-                // Don't show initial dialogue immediately - wait for audio to play
+                scenarioSelect.disabled = true;
                 pendingAIMessage = data.conversation_history[0].message;
             } catch (err) {
                 updateStatus(`Error starting game: ${err.message}`);
@@ -281,6 +327,29 @@
         function handleJsonMessage(data) {
             console.log("Handling JSON:", data);
             switch (data.status) {
+                case "angry_spam_streak":
+                    updateStatus("⚠️ ANGRY SPAM INCOMING!");
+                    isSpamMode = true;
+                    spamQueue = [];
+                    btnPushToTalk.disabled = true;
+                    btnEndGame.disabled = true;
+                    showTypingIndicator();
+                    break;
+                    
+                case "spam_message":
+                    console.log(`Spam ${data.index + 1}/${data.total}: ${data.text}`);
+                    spamQueue.push({
+                        text: data.text,
+                        index: data.index,
+                        audio: null
+                    });
+                    break;
+                    
+                case "spam_streak_complete":
+                    updateStatus("Processing spam streak...");
+                    playSpamStreak();
+                    break;
+                    
                 case "ai_speaking":
                     updateStatus("AI is speaking...");
                     btnPushToTalk.disabled = true;
@@ -288,23 +357,29 @@
                     audioQueue = [];
                     showTypingIndicator();
                     break;
+                    
                 case "ai_finished_speaking":
                     updateStatus("Your turn. Hold to speak.");
                     btnPushToTalk.disabled = false;
                     btnEndGame.disabled = false;
-                    playFullAudio();
+                    if (!isSpamMode) {
+                        playFullAudio();
+                    }
                     break;
+                    
                 case "ai_thinking":
                     updateStatus("AI is thinking...");
                     btnPushToTalk.disabled = true;
                     btnEndGame.disabled = true;
                     break;
+                    
                 case "evaluating":
                     updateStatus("Evaluating your performance...");
                     btnPushToTalk.disabled = true;
                     btnEndGame.disabled = true;
                     stopTimer();
                     break;
+                    
                 case "game_over":
                     updateStatus("Game Over!");
                     resultsDiv.innerHTML = `
@@ -314,12 +389,21 @@
                     stopTimer();
                     socket.close();
                     break;
+                    
                 case "user_response_text":
                     addMessageToChat('user', data.text);
                     break;
+                    
                 case "ai_response_text":
-                    pendingAIMessage = data.text;
+                    // Check if this is a spam response (contains BREAK)
+                    if (data.text && data.text.includes("BREAK")) {
+                        console.log("🔥 Spam response detected, skipping normal display");
+                        // Don't store it - spam messages will be shown individually
+                    } else if (!isSpamMode) {
+                        pendingAIMessage = data.text;
+                    }
                     break;
+                    
                 case "error":
                     updateStatus(`Error: ${data.message}`);
                     break;
@@ -328,7 +412,18 @@
 
         // --- 4. Handle Audio ---
         function handleAudioChunk(audioChunk) {
-            audioQueue.push(audioChunk);
+            if (isSpamMode && spamQueue.length > 0) {
+                // Assign audio to the last spam message that doesn't have audio yet
+                for (let i = 0; i < spamQueue.length; i++) {
+                    if (!spamQueue[i].audio) {
+                        spamQueue[i].audio = audioChunk;
+                        console.log(`Assigned audio to spam message ${i}`);
+                        break;
+                    }
+                }
+            } else {
+                audioQueue.push(audioChunk);
+            }
         }
 
         function playFullAudio() {
@@ -338,17 +433,62 @@
             const audioUrl = URL.createObjectURL(fullAudioBlob);
             audioPlayer.src = audioUrl;
             
-            // Show AI message when audio starts playing
             audioPlayer.onplay = () => {
                 hideTypingIndicator();
+                pauseTimer(); // Pause timer when audio starts
                 if (pendingAIMessage) {
                     addMessageToChat('ai', pendingAIMessage);
                     pendingAIMessage = '';
                 }
             };
             
+            audioPlayer.onended = () => {
+                resumeTimer(); // Resume timer when audio ends
+            };
+            
             audioPlayer.play().catch(e => console.error("Audio play error:", e));
             audioQueue = [];
+        }
+        
+        // --- SPAM STREAK PLAYER ---
+        async function playSpamStreak() {
+            console.log(`Playing spam streak with ${spamQueue.length} messages`);
+            hideTypingIndicator();
+            pauseTimer(); // Pause timer for entire spam streak
+            
+            for (let i = 0; i < spamQueue.length; i++) {
+                const spam = spamQueue[i];
+                
+                // Add message to chat with spam styling
+                addMessageToChat('ai', spam.text, true);
+                
+                // Play audio if available
+                if (spam.audio) {
+                    const audioBlob = new Blob([spam.audio], { type: 'audio/wav' });
+                    const audioUrl = URL.createObjectURL(audioBlob);
+                    audioPlayer.src = audioUrl;
+                    
+                    // Wait for this audio to finish before next message
+                    await new Promise((resolve) => {
+                        audioPlayer.onended = resolve;
+                        audioPlayer.play().catch(e => {
+                            console.error("Spam audio play error:", e);
+                            resolve();
+                        });
+                    });
+                    
+                    // Small delay between spam messages for effect
+                    await new Promise(r => setTimeout(r, 200));
+                }
+            }
+            
+            // Reset spam mode
+            isSpamMode = false;
+            spamQueue = [];
+            resumeTimer(); // Resume timer after spam streak ends
+            updateStatus("Your turn. Hold to speak.");
+            btnPushToTalk.disabled = false;
+            btnEndGame.disabled = false;
         }
 
         // --- 5. Push-to-Talk ---
@@ -396,21 +536,24 @@
         // --- 7. Timer Functions ---
         function startTimer() {
             timeLeft = 120;
+            isTimerPaused = false;
             updateTimerDisplay();
             stopTimer();
 
             timerInterval = setInterval(() => {
-                timeLeft--;
-                updateTimerDisplay();
-                
-                if (timeLeft <= 30) {
-                    timerDiv.classList.add('low');
-                }
+                if (!isTimerPaused) { // Only decrement if not paused
+                    timeLeft--;
+                    updateTimerDisplay();
+                    
+                    if (timeLeft <= 30) {
+                        timerDiv.classList.add('low');
+                    }
 
-                if (timeLeft <= 0) {
-                    console.log("Timer finished, auto-ending game.");
-                    stopTimer();
-                    endGame(true);
+                    if (timeLeft <= 0) {
+                        console.log("Timer finished, auto-ending game.");
+                        stopTimer();
+                        endGame(true);
+                    }
                 }
             }, 1000);
         }
@@ -421,13 +564,25 @@
                 timerInterval = null;
             }
             timeLeft = 120;
+            isTimerPaused = false;
             timerDiv.classList.remove('low');
+        }
+
+        function pauseTimer() {
+            console.log("⏸️ Timer paused (audio playing)");
+            isTimerPaused = true;
+        }
+
+        function resumeTimer() {
+            console.log("▶️ Timer resumed (audio finished)");
+            isTimerPaused = false;
         }
 
         function updateTimerDisplay() {
             const minutes = Math.floor(timeLeft / 60);
             const seconds = timeLeft % 60;
-            timerDiv.textContent = `Time left: ${minutes}:${seconds.toString().padStart(2, '0')}`;
+            const pauseIndicator = isTimerPaused ? ' ⏸️' : '';
+            timerDiv.textContent = `Time left: ${minutes}:${seconds.toString().padStart(2, '0')}${pauseIndicator}`;
         }
         
         // --- 8. End Game Function ---
@@ -443,9 +598,12 @@
         }
 
         // --- 9. Chat Log Function ---
-        function addMessageToChat(role, text) {
+        function addMessageToChat(role, text, isSpam = false) {
             const msgDiv = document.createElement('div');
             msgDiv.classList.add('message', role);
+            if (isSpam) {
+                msgDiv.classList.add('spam');
+            }
             msgDiv.textContent = text;
             chatLog.appendChild(msgDiv);
             chatLog.scrollTop = chatLog.scrollHeight;
@@ -482,7 +640,10 @@
         }
 
         function enableAll(all = true) {
-            if (all) btnStartGame.disabled = false;
+            if (all) {
+                btnStartGame.disabled = false;
+                scenarioSelect.disabled = false;
+            }
             btnConnect.disabled = true;
             btnPushToTalk.disabled = true;
             btnEndGame.disabled = true;
