@@ -112,7 +112,7 @@ A MongoDB instance (local or cloud).
 Bash
 
 ### Clone the repo
-git clone [[your-repo-url](https://github.com/Harsimran-singh-7765/CRUX--backend)]
+git clone [[your-repo-url](https://github.com/Harsimran-singh-7765/CRUX-Conversation-that-defines)]
 cd CRUX--backend
 
 ### Set up your environment
