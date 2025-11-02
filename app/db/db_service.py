@@ -72,24 +72,24 @@ async def db_create_game_session(user_id: str, scenario: Scenario) -> GameSessio
     """
     db = await get_database()
     logger.info(f"Creating new game session for user {user_id} and scenario {scenario.id}")
-    
+
     initial_entry = ConversationEntry(
         role="ai",
         message=scenario.initial_dialogue
     )
-    
+
     new_session = GameSession(
         user_id=user_id,
         scenario_id=scenario.id,
         conversation_history=[initial_entry]
     )
-    
+
     # Dump the model to a dict, but override the 'session_id' field
     # with the original UUID object to store as BSON Binary
     session_data = new_session.model_dump()
-    session_data["session_id"] = new_session.session_id 
+    session_data["session_id"] = new_session.session_id
     await db[COLLECTION_SESSIONS].insert_one(session_data)
-    
+
     logger.info(f"Successfully created game session: {new_session.session_id}")
     return new_session
 
@@ -98,7 +98,7 @@ async def db_get_game_session(session_id: UUID) -> GameSession | None:
     Fetches an active game session by its UUID.
     """
     db = await get_database()
-    
+
     # Query using the raw UUID object to match BSON Binary type
     logger.info(f"Attempting to find game session by UUID object: {session_id}")
     session_doc = await db[COLLECTION_SESSIONS].find_one({"session_id": session_id})
@@ -106,7 +106,7 @@ async def db_get_game_session(session_id: UUID) -> GameSession | None:
     if session_doc:
         logger.info(f"Found game session: {session_id}")
         return GameSession(**session_doc)
-    
+
     logger.warning(f"Could not find game session: {session_id}")
     return None
 
@@ -115,7 +115,7 @@ async def db_end_game_session(session_id: UUID, score: int, justification: str) 
     Finds a game session and updates it with the final score.
     """
     db = await get_database()
-    
+
     # Query by the UUID object
     logger.info(f"Updating final score for session: {session_id}")
     await db[COLLECTION_SESSIONS].update_one(
@@ -129,7 +129,7 @@ async def db_end_game_session(session_id: UUID, score: int, justification: str) 
         }
     )
     logger.info(f"Successfully updated session {session_id} with score: {score}")
-    
+
 
 async def db_check_scenario_exists(scenario_id: str) -> bool:
     """Check if a scenario with given ID already exists."""
