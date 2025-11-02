@@ -301,11 +301,35 @@ btnStartGame.onclick = async () => {
         descriptionInput.disabled = true;
         btnGenerate.disabled = true;
         pendingAIMessage = data.conversation_history[0].message;
+
+        // Fetch and display scenario details
+        await displayScenarioInfo(scenarioId);
     } catch (err) {
         updateStatus(`Error: ${err.message}`);
         console.error("Fetch Error:", err);
     }
 };
+
+async function displayScenarioInfo(scenarioId) {
+    try {
+        const response = await fetch(`${API_URL}/api/v1/scenarios/`);
+        if (!response.ok) throw new Error('Failed to load scenario info');
+
+        const scenarios = await response.json();
+        const scenario = scenarios.find(s => s.id === scenarioId);
+
+        if (scenario && scenario.what_to_do) {
+            const infoDiv = document.getElementById('scenarioInfo');
+            infoDiv.innerHTML = `
+                <h3>💡 What To Do</h3>
+                <p>${scenario.what_to_do}</p>
+            `;
+            infoDiv.style.display = 'block';
+        }
+    } catch (err) {
+        console.error("Error loading scenario info:", err);
+    }
+}
 
 btnConnect.onclick = () => {
     if (!sessionId) {

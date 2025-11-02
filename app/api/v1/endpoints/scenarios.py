@@ -86,7 +86,7 @@ async def get_scenario_by_id(scenario_id: str):
 )
 async def generate_custom_scenario(request: GenerateScenarioRequest):
     """
-    Generates a complete scenario from a user description using Claude AI.
+    Generates a complete scenario from a user description using AI.
     The scenario is automatically saved to the database and ready to play.
     
     **Example descriptions:**
@@ -118,6 +118,8 @@ async def generate_custom_scenario(request: GenerateScenarioRequest):
             character_gender=scenario_data["character_gender"],
             personality_prompt=scenario_data["personality_prompt"],
             initial_dialogue=scenario_data["initial_dialogue"],
+            # --- ADDED THIS LINE ---
+            what_to_do=scenario_data["what_to_do"],
             is_custom=True,
             created_at=datetime.utcnow()
         )
@@ -157,7 +159,7 @@ async def delete_scenario(scenario_id: str):
         deleted = await db_service.db_delete_scenario(scenario_id)
         if not deleted:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
+                status_code=status.HTTP_4404_NOT_FOUND,
                 detail=f"Scenario with ID '{scenario_id}' not found."
             )
         logger.info(f"Successfully deleted scenario: {scenario_id}")
@@ -173,7 +175,6 @@ async def delete_scenario(scenario_id: str):
         )
 
 # === Helper Functions ===
-
 def _create_scenario_id(title: str) -> str:
     """
     Create a URL-safe ID from a scenario title.
