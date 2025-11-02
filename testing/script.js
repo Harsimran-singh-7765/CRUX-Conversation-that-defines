@@ -1,10 +1,3 @@
-// --- WAVIZ CHANGE ---
-// Waviz class ko UMD file se load karein
-const Waviz = window.Waviz ? window.Waviz.default : null;
-if (!Waviz) {
-    console.error("Waviz library (waviz.umd.js) load nahi hui. File path check karein.");
-}
-
 const btnStartGame = document.getElementById('btnStartGame');
 const btnConnect = document.getElementById('btnConnect');
 const btnPushToTalk = document.getElementById('btnPushToTalk');
@@ -26,47 +19,44 @@ const canvasRight = document.getElementById('visualizerRight');
 const ctxLeft = canvasLeft.getContext('2d');
 const ctxRight = canvasRight.getContext('2d');
 
-// --- WAVIZ CHANGE ---
-// AI visualizer (canvasLeft) ke liye Waviz ko initialize karein
-const wavizLeft = Waviz ? new Waviz(canvasLeft, audioPlayer) : null;
-
 let audioContext;
-// --- WAVIZ CHANGE ---
-// Purana AI analyser (analyser, dataArray, bufferLength) hata diya gaya hai.
-// Sirf mic ka analyser (micAnalyser) rakha hai.
+let aiAnalyser, aiDataArray, aiBufferLength;
 let micAnalyser, micDataArray, micBufferLength, micStream, animationId;
-// let analyser, dataArray, bufferLength; // <-- YEH HATA DIYA GAYA
-
 
 function initAudioContext() {
     if (!audioContext) {
         audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        
-        // --- WAVIZ CHANGE ---
-        // audioPlayer ka analyser setup yahan se hata diya gaya hai.
-        // Waviz isse khud handle karega.
-        
-        // drawVisualizers(); // <-- Ise yahan se hata kar 'play' listener mein daalna behtar hai
     }
 }
 
-async function initMicVisualizer(stream) {
-    // --- WAVIZ CHANGE ---
-    // Mic ke liye AudioContext hona zaroori hai
+function initAIVisualizer() {
     if (!audioContext) {
         initAudioContext();
     }
-    
+
+    aiAnalyser = audioContext.createAnalyser();
+    aiAnalyser.fftSize = 512;
+    aiBufferLength = aiAnalyser.frequencyBinCount;
+    aiDataArray = new Uint8Array(aiBufferLength);
+
+    const aiSource = audioContext.createMediaElementSource(audioPlayer);
+    aiSource.connect(aiAnalyser);
+    aiSource.connect(audioContext.destination);
+}
+
+async function initMicVisualizer(stream) {
+    if (!audioContext) {
+        initAudioContext();
+    }
+
     micAnalyser = audioContext.createAnalyser();
     micAnalyser.fftSize = 512;
     micBufferLength = micAnalyser.frequencyBinCount;
     micDataArray = new Uint8Array(micBufferLength);
-    
+
     const micSource = audioContext.createMediaStreamSource(stream);
     micSource.connect(micAnalyser);
-    
-    // --- WAVIZ CHANGE ---
-    // Mic visualizer ke liye draw loop ko yahan se shuru karein
+
     if (!animationId) {
         drawVisualizers();
     }
@@ -75,69 +65,65 @@ async function initMicVisualizer(stream) {
 function stopMicVisualizer() {
     micAnalyser = null;
     micDataArray = null;
-    // --- WAVIZ CHANGE ---
-    // Agar AI visualizer bhi nahi chal raha ho, tab animation loop rokein
-    if (!audioPlayer.paused) {
-         cancelAnimationFrame(animationId);
-         animationId = null;
-    }
 }
 
 function drawVisualizers() {
     animationId = requestAnimationFrame(drawVisualizers);
-    
-    // --- WAVIZ CHANGE ---
-    // canvasLeft (AI) ka drawing code hata diya gaya hai.
-    // Waviz ka apna render loop hai.
-    
-    // Sirf canvasRight (Mic) ka code bacha hai.
+
+    // Draw AI visualizer (left)
+    if (aiAnalyser && aiDataArray && !audioPlayer.paused) {
+        aiAnalyser.getByteFrequencyData(aiDataArray);
+        drawRadialVisualizer(ctxLeft, canvasLeft, aiDataArray);
+    } else {
+        drawRadialVisualizer(ctxLeft, canvasLeft, new Uint8Array(128));
+    }
+
+    // Draw Mic visualizer (right)
     if (micAnalyser && micDataArray) {
         micAnalyser.getByteFrequencyData(micDataArray);
         drawRadialVisualizer(ctxRight, canvasRight, micDataArray);
     } else {
-        // Mic visualizer ko saaf rakhein agar data nahi hai
         drawRadialVisualizer(ctxRight, canvasRight, new Uint8Array(128));
     }
 }
 
-// Yeh function ab sirf mic (canvasRight) ke liye istemal hoga
 function drawRadialVisualizer(ctx, canvas, data) {
     const width = canvas.width;
     const height = canvas.height;
     const centerX = width / 2;
     const centerY = height / 2;
     const radius = Math.min(width, height) / 3;
-    
+
     ctx.clearRect(0, 0, width, height);
-    
+
     const bars = 128;
     const barWidth = 2.5;
-    
+
     for (let i = 0; i < bars; i++) {
         const value = data[Math.floor(i * data.length / bars)] || 0;
         const barHeight = (value / 255) * radius * 0.7;
         const angle = (i / bars) * Math.PI * 2;
-        
+
         const x1 = centerX + Math.cos(angle) * radius;
         const y1 = centerY + Math.sin(angle) * radius;
         const x2 = centerX + Math.cos(angle) * (radius + barHeight);
         const y2 = centerY + Math.sin(angle) * (radius + barHeight);
-        
+
         const gradient = ctx.createLinearGradient(x1, y1, x2, y2);
         gradient.addColorStop(0, '#00BFFF');
         gradient.addColorStop(0.5, '#FF69B4');
         gradient.addColorStop(1, '#FFEB3B');
-        
+
         ctx.strokeStyle = gradient;
         ctx.lineWidth = barWidth;
         ctx.lineCap = 'round';
-        
+
         ctx.beginPath();
         ctx.moveTo(x1, y1);
         ctx.lineTo(x2, y2);
         ctx.stroke();
     }
-    
+
     ctx.beginPath();
     ctx.arc(centerX, centerY, radius - 5, 0, Math.PI * 2);
     ctx.strokeStyle = '#FF69B4';
@@ -145,51 +131,27 @@ function drawRadialVisualizer(ctx, canvas, data) {
     ctx.stroke();
 }
 
-
-// --- WAVIZ CHANGE ---
-// Purane 'play' listener ko Waviz ke listeners se replace karein
-// audioPlayer.addEventListener('play', () => initAudioContext()); // <-- PURANA
-
-audioPlayer.addEventListener('play', async () => {
-    // Pehle mic visualizer ke liye context init karein (agar nahi hai toh)
-    if (!audioContext) {
-        initAudioContext();
+audioPlayer.addEventListener('play', () => {
+    if (!aiAnalyser) {
+        initAIVisualizer();
     }
-    
-    // Mic visualizer loop shuru karein
+
+    if (audioContext.state === 'suspended') {
+        audioContext.resume();
+    }
+
     if (!animationId) {
         drawVisualizers();
     }
-
-    // Ab Waviz (AI visualizer) ko setup karein
-    if (!wavizLeft) return;
-    
-    // Waviz ke liye audio context ko initialize karna (zaroori hai)
-    await wavizLeft.input.initializePending();
-    
-    // Visualizer ko render karein (Dots3 jaisa effect)
-        wavizLeft.visualizer.render([
-        {
-            domain: ['freq'], // Frequency data
-            coord: ['polar', 70], // 70px ka inner radius
-            viz: ['dots', 120], // 120 dots
-            
-            // Screenshot jaisa radial gradient:
-            color: ['radialGradient', '#E353B0', '#2400FF', 70, 150], 
-            
-            style: ['stroke', 3] // 3px dot ka size
-        }
-    ]);
 });
 
-// Audio pause/end hone par visualizer ko rokein
 audioPlayer.addEventListener('pause', () => {
-    if (wavizLeft) wavizLeft.visualizer.stop();
-});
-audioPlayer.addEventListener('ended', () => {
-    if (wavizLeft) wavizLeft.visualizer.stop();
+    // Visualizer will show empty state automatically
 });
 
+audioPlayer.addEventListener('ended', () => {
+    // Visualizer will show empty state automatically
+});
 
 let sessionId = null, socket = null, mediaRecorder = null, audioQueue = [];
 let timerInterval = null, timeLeft = 120, typingIndicator = null;
@@ -199,12 +161,26 @@ const API_URL = "http://127.0.0.1:8000";
 const WS_URL = "ws://127.0.0.1:8000";
 const TEST_USER_ID = "html_test_user";
 
+// Initialize visualizers on page load
+function initializeVisualizers() {
+    // Draw empty state circles immediately
+    drawRadialVisualizer(ctxLeft, canvasLeft, new Uint8Array(128));
+    drawRadialVisualizer(ctxRight, canvasRight, new Uint8Array(128));
+
+    // Start animation loop
+    if (!animationId) {
+        drawVisualizers();
+    }
+}
+
+// Initialize on page load
+initializeVisualizers();
 loadScenarios();
 
 descriptionInput.addEventListener('input', () => {
     const length = descriptionInput.value.length;
     charCount.textContent = `${length} / 500`;
-    
+
     if (length < 10) {
         charCount.classList.remove('warning');
         btnGenerate.disabled = true;
@@ -230,32 +206,32 @@ btnGenerate.onclick = async () => {
         updateStatus("Description must be 10-500 characters");
         return;
     }
-    
+
     btnGenerate.disabled = true;
     btnGenerate.innerHTML = '<span class="loading"></span> Generating...';
     updateStatus("🤖 AI is creating your scenario...");
-    
+
     try {
         const response = await fetch(`${API_URL}/api/v1/scenarios/generate`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ description })
         });
-        
+
         if (!response.ok) {
             const error = await response.json();
             throw new Error(error.detail || 'Failed to generate scenario');
         }
-        
+
         const data = await response.json();
         updateStatus(`✅ Created: ${data.scenario.title}`);
-        
+
         descriptionInput.value = '';
         charCount.textContent = '0 / 500';
-        
+
         await loadScenarios();
         scenarioSelect.value = data.scenario.id;
-        
+
     } catch (err) {
         updateStatus(`❌ Error: ${err.message}`);
         console.error("Generation Error:", err);
@@ -272,7 +248,7 @@ async function loadScenarios() {
     try {
         const response = await fetch(`${API_URL}/api/v1/scenarios/`);
         if (!response.ok) throw new Error('Failed to load scenarios');
-        
+
         const scenarios = await response.json();
         scenarioSelect.innerHTML = '';
         scenarios.forEach(scenario => {
@@ -281,7 +257,7 @@ async function loadScenarios() {
             option.textContent = scenario.title;
             scenarioSelect.appendChild(option);
         });
-        
+
         if (scenarios.length === 0) {
             scenarioSelect.innerHTML = '<option>No scenarios available</option>';
         }
@@ -299,22 +275,22 @@ btnStartGame.onclick = async () => {
         updateStatus("Please select a scenario first");
         return;
     }
-    
+
     updateStatus("Starting game...");
     chatLog.innerHTML = "";
     resultsDiv.style.display = 'none';
     resultsDiv.innerHTML = "";
     updateTimerDisplay();
-    
+
     try {
         const response = await fetch(`${API_URL}/api/v1/game/start/${scenarioId}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ user_id: TEST_USER_ID })
         });
-        
+
         if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
-        
+
         const data = await response.json();
         sessionId = data.session_id;
         updateStatus(`Game created!`);
@@ -336,7 +312,7 @@ btnConnect.onclick = () => {
         updateStatus("No session ID. Start a game first.");
         return;
     }
-    
+
     updateStatus("Connecting...");
     socket = new WebSocket(`${WS_URL}/api/v1/game/ws/${sessionId}`);
     socket.binaryType = 'blob';
@@ -452,7 +428,7 @@ function playFullAudio() {
     if (audioQueue.length === 0) return;
     const fullAudioBlob = new Blob(audioQueue, { type: 'audio/wav' });
     audioPlayer.src = URL.createObjectURL(fullAudioBlob);
-    
+
     audioPlayer.onplay = () => {
         hideTypingIndicator();
         pauseTimer();
@@ -461,7 +437,7 @@ function playFullAudio() {
             pendingAIMessage = '';
         }
     };
-    
+
     audioPlayer.onended = () => resumeTimer();
     audioPlayer.play().catch(e => console.error("Audio error:", e));
     audioQueue = [];
@@ -470,10 +446,10 @@ function playFullAudio() {
 async function playSpamStreak() {
     hideTypingIndicator();
     pauseTimer();
-    
+
     for (let spam of spamQueue) {
         addMessageToChat('ai', spam.text, true);
-        
+
         if (spam.audio) {
             audioPlayer.src = URL.createObjectURL(new Blob([spam.audio], { type: 'audio/wav' }));
             await new Promise((resolve) => {
@@ -483,7 +459,7 @@ async function playSpamStreak() {
             await new Promise(r => setTimeout(r, 200));
         }
     }
-    
+
     isSpamMode = false;
     spamQueue = [];
     resumeTimer();
@@ -494,27 +470,27 @@ async function playSpamStreak() {
 
 btnPushToTalk.onmousedown = async () => {
     if (!socket) return;
-    
+
     if (!audioPlayer.paused) {
         console.log("🚫 Interrupting AI");
         audioPlayer.pause();
         audioPlayer.currentTime = 0;
         resumeTimer();
     }
-    
+
     try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         micStream = stream;
         await initMicVisualizer(stream);
-        
-        mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' }); 
+
+        mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
 
         mediaRecorder.ondataavailable = (event) => {
             if (event.data.size > 0 && socket.readyState === WebSocket.OPEN) {
                 socket.send(event.data);
             }
         };
-        
+
         mediaRecorder.onstop = () => {
             if (socket.readyState === WebSocket.OPEN) {
                 sendJson({ action: "stop_speaking" });
@@ -522,7 +498,7 @@ btnPushToTalk.onmousedown = async () => {
             stream.getTracks().forEach(track => track.stop());
             stopMicVisualizer();
         };
-        
+
         mediaRecorder.start(500);
         sendJson({ action: "start_speaking" });
         updateStatus("Listening... Release to stop.");
@@ -552,7 +528,7 @@ function startTimer() {
         if (!isTimerPaused) {
             timeLeft--;
             updateTimerDisplay();
-            
+
             if (timeLeft <= 30) {
                 timerDiv.classList.add('low');
             }
@@ -653,11 +629,13 @@ function enableAll(all = true) {
     btnPushToTalk.disabled = true;
     btnEndGame.disabled = true;
 
-    // --- WAVIZ CHANGE ---
-    // Game reset hone par AI visualizer ko rokein aur saaf karein
-    if (all && wavizLeft) {
-        wavizLeft.visualizer.stop();
-        // Canvas ko clear karein
+    if (all) {
+        // Clear both canvases
         ctxLeft.clearRect(0, 0, canvasLeft.width, canvasLeft.height);
+        ctxRight.clearRect(0, 0, canvasRight.width, canvasRight.height);
+
+        // Reset AI analyser
+        aiAnalyser = null;
+        aiDataArray = null;
     }
 }

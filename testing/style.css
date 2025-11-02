@@ -381,6 +381,7 @@ select {
     background-position: right 0.8rem center;
     padding-right: 2.8rem;
     transition: all 0.2s;
+    border-radius: 0px;
 }
 
 select:hover {
@@ -391,7 +392,7 @@ select:hover {
 
 select:focus {
     outline: none;
-    background-color: #e6f7ff;
+    background-color: white;
     box-shadow: 0 0 0 3px var(--color-blue), 2px 2px 0 0 black;
 }
 
@@ -401,17 +402,37 @@ select:active {
 }
 
 select option {
-    padding: 1rem;
+    padding: 0.8rem;
     background: white;
     color: var(--color-text-dark);
     font-size: 0.6rem;
-    line-height: 1.8;
+    line-height: 1.6;
+    border: none;
+}
+
+select option:hover {
+    background: var(--color-blue);
+    color: white;
+}
+
+select option:checked,
+select option:focus {
+    background: var(--color-blue) !important;
+    color: white !important;
+    font-weight: bold;
+}
+
+@-moz-document url-prefix() {
+    select option:checked {
+        background: var(--color-blue) linear-gradient(0deg, var(--color-blue) 0%, var(--color-blue) 100%) !important;
+        color: white !important;
+    }
 }
 
 select option:checked {
-    background: linear-gradient(90deg, var(--color-blue) 0%, var(--color-blue) 100%);
+    background: var(--color-blue);
+    background-color: var(--color-blue);
     color: white;
-    font-weight: bold;
 }
 
 textarea {
