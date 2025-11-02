@@ -345,8 +345,14 @@ button:disabled {
 }
 
 .btn-small {
-    padding: 0.6rem 0.8rem;
-    font-size: 0.6rem;
+    padding: 0.5rem;
+    font-size: 1.2rem;
+    min-width: 44px;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
 }
 
 .btn-full {
@@ -366,51 +372,57 @@ select {
     line-height: 1.5;
 }
 
-/* Add these new styles for the dropdown */
 select {
-    width: 100%;
-    padding: 0.8rem;
-    border: var(--border-thickness) solid black;
-    box-shadow: 2px 2px 0 0 black;
-    font-family: 'Press Start 2P', cursive;
-    font-size: 0.6rem;
-    margin-bottom: 0.8rem;
-    line-height: 1.5;
     background: white;
     cursor: pointer;
     appearance: none;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23333' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Cpath fill='%23333' d='M8 11L3 6h10z'/%3E%3C/svg%3E");
     background-repeat: no-repeat;
     background-position: right 0.8rem center;
-    padding-right: 2.5rem;
+    padding-right: 2.8rem;
+    transition: all 0.2s;
 }
 
 select:hover {
-    background-color: #f0f0f0;
+    background-color: #f5f5f5;
+    transform: translate(1px, 1px);
+    box-shadow: 1px 1px 0 0 black;
 }
 
 select:focus {
     outline: none;
+    background-color: #e6f7ff;
     box-shadow: 0 0 0 3px var(--color-blue), 2px 2px 0 0 black;
 }
 
-/* Dropdown options styling */
+select:active {
+    transform: translate(2px, 2px);
+    box-shadow: 0 0 0 0 black;
+}
+
 select option {
-    padding: 0.8rem;
+    padding: 1rem;
     background: white;
     color: var(--color-text-dark);
     font-size: 0.6rem;
+    line-height: 1.8;
 }
 
-select option:hover,
 select option:checked {
-    background: var(--color-blue);
+    background: linear-gradient(90deg, var(--color-blue) 0%, var(--color-blue) 100%);
     color: white;
+    font-weight: bold;
 }
 
 textarea {
     resize: vertical;
     min-height: 100px;
+}
+
+textarea:focus {
+    outline: none;
+    background-color: #f9f9f9;
+    box-shadow: 0 0 0 3px var(--color-blue), 2px 2px 0 0 black;
 }
 
 .char-count {
@@ -423,27 +435,6 @@ textarea {
     color: var(--color-pink);
     font-weight: bold;
 }
-
-/* .example-chips {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.6rem;
-    margin-bottom: 1.2rem;
-}
-
-.example-chip {
-    background: var(--color-light-green);
-    padding: 0.5rem 0.7rem;
-    font-size: 0.55rem;
-    cursor: pointer;
-    border: 2px solid black;
-    box-shadow: 2px 2px 0 0 black;
-    line-height: 1.4;
-}
-
-.example-chip:hover {
-    background: var(--color-yellow);
-} */
 
 .example-chips {
     display: grid;
@@ -462,6 +453,7 @@ textarea {
     line-height: 1.4;
     text-align: center;
     width: 100%;
+    transition: all 0.1s;
 }
 
 .example-chip:hover {
@@ -474,8 +466,6 @@ textarea {
     transform: translate(2px, 2px);
     box-shadow: 0 0 0 0 black;
 }
-
-
 
 .scenario-header {
     display: flex;
