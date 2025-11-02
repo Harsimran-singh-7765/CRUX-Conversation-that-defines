@@ -3,6 +3,14 @@
 CRUX is a full-stack, real-time audio-visual application designed for practicing difficult conversations. It uses a **FastAPI** backend to power an AI character (driven by **Google Gemini**) and a **Deepgram**-powered voice.
 
 The **vanilla JavaScript** frontend (`testing/main.html`) provides a complete interface for generating new scenarios, connecting to a live game, and interacting with the AI. The key feature is a bi-directional audio-visual system: the client visualizes the AI's voice on one canvas and the user's microphone input on another, all in real-time.
+**currenly it is not Deployed bcz of API rate issue**
+
+## 🎥 Project Demo
+
+Watch a full video walkthrough and demo of the project in action:
+
+**[Watch Project Demo (Google Drive)](https://drive.google.com/file/d/1UhwQmAMHq7eH29227X7AGRJDXp3lK_-S/view?usp=sharing)**
+
 
 ## 🚀 What This Thing Actually Does
 
