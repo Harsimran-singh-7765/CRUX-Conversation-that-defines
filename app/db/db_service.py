@@ -3,7 +3,7 @@ from motor.motor_asyncio import AsyncIOMotorDatabase
 from app.db.mongodb_utils import get_database
 from app.schemas.game_schemas import Scenario, GameSession, GameStartRequest, ConversationEntry
 from uuid import UUID
-
+from datetime import datetime
 logger = logging.getLogger(__name__)
 
 # --- Collection Names ---
