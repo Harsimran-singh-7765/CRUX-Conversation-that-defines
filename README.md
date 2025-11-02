@@ -19,52 +19,64 @@ This diagram shows the complete user journey from starting the app to getting a 
 
 ```mermaid
 graph TD
-    subgraph Client (testing/main.html)
-        A[User Loads Page] --> B{Fetch Scenarios?};
-        B --> |Yes| C[GET /api/v1/scenarios];
-        B --> |No| D[User Writes Prompt];
-        D --> E[POST /api/v1/scenarios/generate];
-        C --> F[Populate Dropdown];
-        E --> F;
-        F --> G[User Selects & Clicks "Start"];
-        G --> H[POST /api/v1/game/start/{id}];
-        H --> I[Receive session_id];
-        I --> J[Connect WS /api/v1/game/ws/{session_id}];
-        J --> K[Game Loop: Audio & Viz];
-        K --> L[User Holds PTT];
-        L --> M[Stream User Mic Audio];
-        M --> K;
-        K --> N[User Clicks "End Game"];
-        N --> O[Receive Final Score];
-    end
 
-    subgraph Backend (app/)
-        C --> DB1[(MongoDB)];
-        E --> SGen[scenario_generator.py];
-        SGen --> G_LLM[Gemini LLM];
-        G_LLM --> SGen;
-        SGen --> DB2[(MongoDB)];
-        H --> EP_Game[game.py];
-        EP_Game --> DB3[(MongoDB)];
-        DB3 --> EP_Game;
-        EP_Game --> J;
-        J --> GSM[GameSessionManager];
-        GSM --> |TTS| DG_TTS[Deepgram TTS];
-        DG_TTS --> GSM;
-        GSM --> K;
-        M --> GSM;
-        GSM --> |STT| DG_STT[Deepgram STT];
-        DG_STT --> GSM;
-        GSM --> |Prompt| G_LLM;
-        G_LLM --> |"Text" or "Text BREAK Text"| GSM;
-        N --> GSM;
-        GSM --> |Evaluate| G_LLM;
-        G_LLM --> |Score| GSM;
-        GSM --> O;
-    end
+%% ================= Client =================
+subgraph Client [Client: testing/main.html]
+    A[User Loads Page] --> B{Fetch Existing Scenarios?}
+    B --> |Yes| C[GET /api/v1/scenarios]
+    B --> |No| D[User Writes Prompt]
+    D --> E[POST /api/v1/scenarios/generate]
+    C --> F[Fill Dropdown]
+    E --> F
+    F --> G[User Starts Game]
+    G --> H[POST /api/v1/game/start/:id]
+    H --> I[Receive session_id]
+    I --> J[Open WebSocket /api/v1/game/ws/:session_id]
+    J --> K[Game Loop: Send Mic + Receive TTS]
+    K --> L[User Hold PTT]
+    L --> M[Stream Mic Audio]
+    M --> K
+    K --> N[User Ends Game]
+    N --> O[Receive Score + Feedback]
+end
 
+%% ================= Backend =================
+subgraph Backend [FastAPI Backend]
+    C --> DB1[(MongoDB)]
+    E --> SG[scenario_generator.py]
+    SG --> LLM[Gemini LLM]
+    LLM --> SG
+    SG --> DB2[(MongoDB)]
 
+    H --> GE[game.py start handler]
+    GE --> DB3[(MongoDB)]
+    DB3 --> GE
+    GE --> WS[WebSocket Session]
+
+    WS --> GSM[GameSessionManager]
+    GSM --> STT[Deepgram STT]
+    STT --> GSM
+    GSM --> TTS[Deepgram TTS]
+    TTS --> GSM
+    GSM --> LLM
+    LLM --> GSM
+    GSM --> O
+end
+
+%% ================= Styles =================
+classDef client fill:#c3e6ff,stroke:#1573c4,stroke-width:1.7,color:#00294d;
+classDef backend fill:#ead7ff,stroke:#7b2cbf,stroke-width:1.7,color:#3a0069;
+classDef service fill:#fff1cc,stroke:#ffb600,stroke-width:1.5,color:#5a4500;
+classDef db fill:#d5ffd4,stroke:#28a23f,stroke-width:2,color:#003c16;
+classDef decision fill:#fffbc9,stroke:#c5a000,stroke-width:2,color:#6a5800;
+
+class A,B,C,D,E,F,G,H,I,J,K,L,M,N,O client
+class SG,GE,WS,GSM backend
+class LLM,TTS,STT service
+class DB1,DB2,DB3 db
+class B decision
 ```
+
 #  The Tech Stack
 ## Backend (app/ directory)
 **Framework**: FastAPI for async APIs and WebSockets.
