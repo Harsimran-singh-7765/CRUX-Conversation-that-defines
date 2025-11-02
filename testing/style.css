@@ -1,0 +1,414 @@
+:root {
+    --color-bg: #1B2021;
+    --color-light-green: #D8F8B6;
+    --color-blue: #00BFFF;
+    --color-pink: #FF69B4;
+    --color-yellow: #FFEB3B;
+    --color-text-dark: #333;
+    --color-text-light: white;
+    --border-thickness: 3px;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Press Start 2P', cursive, sans-serif; 
+    background-color: var(--color-light-green);
+    color: var(--color-text-dark);
+    /* This flex layout is essential for full-height sidebars and content */
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.logo-container {
+    position: relative; 
+    background: transparent;
+    padding: 0.8rem;
+    text-align: center;
+    border-bottom: var(--border-thickness) solid black;
+}
+
+.logo {
+    font-family: 'Permanent Marker', cursive;
+    font-size: 2.5rem;
+    color: black; 
+    text-shadow: 
+        2px 2px 0 var(--color-blue),
+        -2px -2px 0 var(--color-pink);
+    animation: glitch 3s infinite;
+    display: inline-block;
+}
+
+@keyframes glitch {
+    0%, 90%, 100% {
+        transform: translate(0);
+        text-shadow: 
+            2px 2px 0 var(--color-blue),
+            -2px -2px 0 var(--color-pink);
+    }
+    92% {
+        transform: translate(-3px, 2px);
+        text-shadow: 
+            5px 0 0 var(--color-blue),
+            -5px 0 0 var(--color-pink);
+    }
+    94% {
+        transform: translate(2px, -2px);
+        text-shadow: 
+            -3px 3px 0 var(--color-blue),
+            3px -3px 0 var(--color-pink);
+    }
+    96% {
+        transform: translate(-2px, 1px);
+        text-shadow: 
+            2px -2px 0 var(--color-blue),
+            -2px 2px 0 var(--color-pink);
+    }
+}
+
+.main-container {
+    display: flex;
+    flex: 1; /* This makes it fill the remaining height of the body */
+    gap: 1rem;
+    padding: 1rem;
+    overflow: hidden;
+}
+
+.sidebar {
+    width: 300px;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    height: 100%; /* This makes it full-height */
+    overflow-y: auto;
+    flex-shrink: 0;
+}
+
+.sidebar-section {
+    background: white;
+    padding: 1.2rem;
+    border: var(--border-thickness) solid black;
+    box-shadow: var(--border-thickness) var(--border-thickness) 0 0 black;
+    flex-shrink: 0;
+}
+
+.sidebar-section h2 {
+    font-family: 'Press Start 2P', cursive;
+    font-size: 1rem;
+    margin-bottom: 1rem;
+    color: black;
+    line-height: 1.4;
+}
+
+.center-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    position: relative;
+    height: 100%; /* This is crucial for the children's height */
+}
+
+.visualizer-area {
+    height: 40%; /* Fixed height for the top part */
+    background: white;
+    border: var(--border-thickness) solid black;
+    box-shadow: var(--border-thickness) var(--border-thickness) 0 0 black;
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+    padding: 1rem;
+    position: relative;
+}
+
+.visualizer-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.visualizer-label {
+    font-weight: bold;
+    font-size: 0.7rem;
+    color: var(--color-text-dark);
+}
+
+canvas.visualizer {
+    display: block;
+    filter: drop-shadow(0 0 15px rgba(255, 105, 180, 0.4));
+}
+
+.floating-timer {
+    position: absolute;
+    top: 1rem;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--color-yellow);
+    padding: 0.8rem 1.5rem;
+    border: var(--border-thickness) solid black;
+    box-shadow: var(--border-thickness) var(--border-thickness) 0 0 black;
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: black;
+    z-index: 10;
+}
+
+.floating-timer.low {
+    background: var(--color-pink);
+    color: white;
+    animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { transform: translateX(-50%) scale(1); }
+    50% { transform: translateX(-50%) scale(1.05); }
+}
+
+.chat-area {
+    flex: 1; /* This makes it fill the *remaining* space (60%) */
+    background: white;
+    border: var(--border-thickness) solid black;
+    box-shadow: var(--border-thickness) var(--border-thickness) 0 0 black;
+    display: flex;
+    flex-direction: column;
+    padding: 1rem;
+    /* We add overflow: hidden here to be safe */
+    overflow: hidden; 
+}
+
+#status {
+    font-size: 0.7rem;
+    font-weight: bold;
+    color: white;
+    margin-bottom: 0.8rem;
+    padding: 0.8rem;
+    background: var(--color-blue);
+    border: 2px solid black;
+    text-align: center;
+    line-height: 1.4;
+    /* It should not shrink */
+    flex-shrink: 0; 
+}
+
+#chatLog {
+    flex: 1; /* This makes the log fill the space between status and controls */
+    overflow-y: auto; /* THIS IS THE SCROLLBAR */
+    padding: 0.8rem;
+    background: #f5f5ff;
+    border: 2px solid black;
+    margin-bottom: 0.8rem;
+    /* Add this to prevent issues */
+    min-height: 0; 
+}
+
+.message {
+    margin-bottom: 0.5rem;
+    padding: 0.6rem 0.8rem;
+    max-width: 70%;
+    word-wrap: break-word;
+    border: 2px solid black;
+    box-shadow: 2px 2px 0 0 black;
+    font-size: 0.65rem;
+    line-height: 1.5;
+}
+
+.message.user {
+    background-color: var(--color-blue);
+    color: white;
+    margin-left: auto;
+}
+
+.message.ai {
+    background-color: #e0e0e0;
+    color: var(--color-text-dark);
+    margin-right: auto;
+}
+
+.message.ai.spam {
+    background-color: var(--color-pink);
+    color: white;
+    animation: spamPop 0.3s ease-out;
+    font-weight: bold;
+}
+
+@keyframes spamPop {
+    0% { transform: scale(0.9) translateX(-10px); opacity: 0; }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1) translateX(0); opacity: 1; }
+}
+
+.typing-indicator {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0.5rem 0.8rem;
+    background-color: #e0e0e0;
+    max-width: 80px;
+    margin-bottom: 0.5rem;
+    border: 2px solid black;
+}
+
+.typing-indicator span {
+    width: 8px;
+    height: 8px;
+    background-color: #999;
+    border-radius: 50%;
+    animation: typing 1.4s infinite;
+}
+
+.typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
+.typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes typing {
+    0%, 60%, 100% { transform: translateY(0); }
+    30% { transform: translateY(-8px); }
+}
+
+.chat-controls {
+    display: flex;
+    gap: 0.5rem;
+    /* It should not shrink */
+    flex-shrink: 0; 
+}
+
+button {
+    font-size: 0.7rem;
+    padding: 0.8rem 1rem;
+    border: var(--border-thickness) solid black;
+    cursor: pointer;
+    font-weight: bold;
+    text-transform: uppercase;
+    font-family: 'Press Start 2P', cursive;
+    box-shadow: var(--border-thickness) var(--border-thickness) 0 0 black;
+    transition: all 0.1s;
+    line-height: 1.4;
+}
+
+button:hover:not(:disabled) {
+    transform: translate(1px, 1px);
+    box-shadow: 2px 2px 0 0 black;
+}
+
+button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.btn-primary {
+    background: var(--color-blue);
+    color: white;
+    flex: 1;
+}
+
+.btn-danger {
+    background: var(--color-pink);
+    color: white;
+    flex: 1;
+}
+
+.btn-small {
+    padding: 0.6rem 0.8rem;
+    font-size: 0.6rem;
+}
+
+.btn-full {
+    width: 100%;
+    margin-bottom: 0.5rem;
+}
+
+textarea, select {
+    width: 100%;
+    padding: 0.8rem;
+    border: var(--border-thickness) solid black;
+    box-shadow: 2px 2px 0 0 black;
+    font-family: 'Press Start 2P', cursive;
+    font-size: 0.6rem;
+    margin-bottom: 0.5rem;
+    line-height: 1.5;
+}
+
+textarea {
+    resize: vertical;
+    min-height: 100px;
+}
+
+.char-count {
+    font-size: 0.6rem;
+    text-align: right;
+    margin-bottom: 0.5rem;
+}
+
+.char-count.warning { color: var(--color-pink); font-weight: bold; }
+
+.example-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 0.8rem;
+}
+
+.example-chip {
+    background: var(--color-light-green);
+    padding: 0.4rem 0.6rem;
+    font-size: 0.55rem;
+    cursor: pointer;
+    border: 2px solid black;
+    box-shadow: 2px 2px 0 0 black;
+    line-height: 1.4;
+}
+
+.example-chip:hover {
+    background: var(--color-yellow);
+}
+
+#results {
+    background: white;
+    padding: 1rem;
+    border: var(--border-thickness) solid black;
+    box-shadow: var(--border-thickness) var(--border-thickness) 0 0 black;
+    margin-top: 1rem;
+}
+
+#results h3 {
+    font-size: 0.9rem;
+    margin-bottom: 0.8rem;
+    color: var(--color-pink);
+    line-height: 1.4;
+}
+
+#results p {
+    font-size: 0.6rem;
+    line-height: 1.5;
+}
+
+.loading {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border: 3px solid rgba(255,255,255,.3);
+    border-radius: 50%;
+    border-top-color: #fff;
+    animation: spin 1s ease-in-out infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+.scenario-header {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.scenario-header select {
+    flex: 1;
+    margin: 0;
+}
