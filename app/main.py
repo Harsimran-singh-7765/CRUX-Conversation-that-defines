@@ -20,7 +20,8 @@ origins = [
     "http://127.0.0.1:3000",
     "http://localhost",
     "http://127.0.0.1",
-     "https://crux-conversation-that-defines.vercel.app"
+     "https://crux-conversation-that-defines.vercel.app",
+    "https://crux-osdc.vercel.app"
 ]
 
 app.add_middleware(
