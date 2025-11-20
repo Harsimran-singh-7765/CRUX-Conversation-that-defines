@@ -20,12 +20,13 @@ origins = [
     "http://127.0.0.1:3000",
     "http://localhost",
     "http://127.0.0.1",
+    "https://crux-conversation-that-defines.vercel.app/"
 ]
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
-    allow_credentials=True, # <-- Keep this False
+    allow_credentials=False, # <-- Keep this False
     allow_methods=["*"], 
     allow_headers=["*"], 
 )

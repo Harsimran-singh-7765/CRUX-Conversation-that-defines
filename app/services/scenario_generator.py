@@ -83,7 +83,6 @@ class ScenarioGenerator:
             logger.error(f"Error generating scenario: {e}")
             # Reraise the exception for the caller to handle
             raise
-    
     def _get_json_schema(self) -> types.Schema:
         """Define the JSON schema for structured output."""
         return types.Schema(
@@ -93,11 +92,11 @@ class ScenarioGenerator:
                 "character_name": types.Schema(type=types.Type.STRING, description="First name only (Indian names preferred)"),
                 "character_gender": types.Schema(type=types.Type.STRING, description="Must be 'male' or 'female'"),
                 "personality_prompt": types.Schema(type=types.Type.STRING, description="Detailed personality description (200-400 words)"),
-                "initial_dialogue": types.Schema(type=types.Type.STRING, description="First message from character (1-2 sentences)")
+                "initial_dialogue": types.Schema(type=types.Type.STRING, description="First message from character (1-2 sentences)"),
+                "what_to_do": types.Schema(type=types.Type.STRING, description="Brief instruction for the user about their goal (50-150 chars)")
             },
-            required=["title", "character_name", "character_gender", "personality_prompt", "initial_dialogue"]
+            required=["title", "character_name", "character_gender", "personality_prompt", "initial_dialogue", "what_to_do"]
         )
-
     def _build_generation_prompt(self, description: str) -> str:
         """Build the prompt for scenario generation."""
         # Note: Since we use response_mime_type="application/json" and a schema,

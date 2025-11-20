@@ -157,8 +157,9 @@ let sessionId = null, socket = null, mediaRecorder = null, audioQueue = [];
 let timerInterval = null, timeLeft = 120, typingIndicator = null;
 let pendingAIMessage = '', isTimerPaused = false, isSpamMode = false, spamQueue = [];
 
-const API_URL = "http://127.0.0.1:8000";
-const WS_URL = "ws://127.0.0.1:8000";
+const API_URL = window.__ENV__.API_URL;
+const WS_URL = window.__ENV__.WS_URL;
+
 const TEST_USER_ID = "html_test_user";
 
 // Initialize visualizers on page load
